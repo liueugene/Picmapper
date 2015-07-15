@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">PhotoMap</string>
     <string name="title_activity_maps">MapActivity</string>
-
-<!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="preference_file_key">com.litesplash.photomap.pref_file_key</string>
 </resources>

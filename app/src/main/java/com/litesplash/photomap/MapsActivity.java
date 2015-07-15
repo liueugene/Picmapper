@@ -1,15 +1,12 @@
 package com.litesplash.photomap;
 
-import android.app.ActionBar;
-import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.ExifInterface;
-import android.os.AsyncTask;
-import android.os.Environment;
+import android.app.FragmentTransaction;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -18,22 +15,22 @@ import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.maps.android.clustering.Cluster;
 import com.google.maps.android.clustering.ClusterManager;
 import com.google.maps.android.clustering.view.DefaultClusterRenderer;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayList;
 
-public class MapsActivity extends Activity implements ClusterManager.OnClusterItemClickListener<PhotoMarker>, ClusterManager.OnClusterClickListener, GoogleMap.OnMapClickListener, GoogleMap.OnCameraChangeListener {
+public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, ClusterManager.OnClusterItemClickListener<PhotoMarker>,
+        ClusterManager.OnClusterClickListener, GoogleMap.OnMapClickListener, GoogleMap.OnCameraChangeListener, PhotoListFragment.PhotoListItemClickListener {
 
     protected static final String TAG = "PhotoMap";
 
@@ -42,47 +39,29 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
     private DefaultClusterRenderer<PhotoMarker> renderer;
 
     private PhotoMarker lastActiveMarker;
+    private Marker lastActiveNonClusteredMarker;
     private float lastZoom;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().setBackgroundDrawable(null); //remove background overdraw
         setContentView(R.layout.activity_maps);
-        setUpMapIfNeeded();
+
+        ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        setUpMapIfNeeded();
+
+        if(gMap == null)
+            ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
     }
 
-    /**
-     * Sets up the map if it is possible to do so (i.e., the Google Play services APK is correctly
-     * installed) and the map has not already been instantiated.. This will ensure that we only ever
-     * call {@link #setUpMap()} once when {@link #gMap} is not null.
-     * <p/>
-     * If it isn't installed {@link MapFragment} (and
-     * {@link com.google.android.gms.maps.MapView MapView}) will show a prompt for the user to
-     * install/update the Google Play services APK on their device.
-     * <p/>
-     * A user can return to this FragmentActivity after following the prompt and correctly
-     * installing/updating/enabling the Google Play services. Since the FragmentActivity may not
-     * have been completely destroyed during this process (it is likely that it would only be
-     * stopped or paused), {@link #onCreate(Bundle)} may not be called again so we should call this
-     * method in {@link #onResume()} to guarantee that it will be called.
-     */
-    private void setUpMapIfNeeded() {
-        // Do a null check to confirm that we have not already instantiated the map.
-        if (gMap == null) {
-            // Try to obtain the map from the SupportMapFragment.
-            gMap = ((MapFragment) getFragmentManager().findFragmentById(R.id.map))
-                    .getMap();
-            // Check if we were successful in obtaining the map.
-            if (gMap != null) {
-                setUpMap();
-            }
-        }
+    public void onMapReady(GoogleMap googleMap) {
+        gMap = googleMap;
+        setUpMap();
     }
 
     /**
@@ -103,44 +82,55 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
         clusterManager.setRenderer(renderer);
         clusterManager.setOnClusterItemClickListener(this);
         clusterManager.setOnClusterClickListener(this);
-        clusterManager.getMarkerCollection().setOnInfoWindowAdapter(new PhotoInfoWindowAdapter());
+//        clusterManager.getMarkerCollection().setOnInfoWindowAdapter(new PhotoInfoWindowAdapter());
 
-        new LoadPhotosTask().execute();
+        new LoadPhotosTask(clusterManager).execute();
     }
 
+    private void addInfoFragment(PhotoMarker photoMarker) {
+        removeInfoFragment();
+        PhotoInfoFragment infoFragment = PhotoInfoFragment.newInstance(photoMarker);
 
-    private void removeInfoFrag(FragmentManager fm) {
+        getFragmentManager().beginTransaction()
+                .setCustomAnimations(R.animator.slide_up, 0, 0, R.animator.slide_down)
+                .add(R.id.maps_activity, infoFragment, "photoInfoFragment")
+                .addToBackStack(null)
+                .commit();
+    }
+
+    private void removeInfoFragment() {
+        FragmentManager fm = getFragmentManager();
         PhotoInfoFragment infoFrag = (PhotoInfoFragment) fm.findFragmentByTag("photoInfoFragment");
 
-        if (infoFrag != null) {
+        if (infoFrag != null) {/*
             fm.beginTransaction()
-                    .setCustomAnimations(R.animator.slide_up, R.animator.slide_down, R.animator.slide_up, R.animator.slide_down)
+                    .setCustomAnimations(0, R.animator.slide_down)
                     .remove(infoFrag)
                     .commit();
+                    */
+            fm.popBackStackImmediate();
+
+            if (lastActiveNonClusteredMarker != null) {
+                lastActiveNonClusteredMarker.remove();
+                lastActiveNonClusteredMarker = null;
+            }
         }
     }
 
     public boolean onClusterItemClick(PhotoMarker photoMarker) {
-        getActionBar().show();
+        getSupportActionBar().show();
 
-        Bundle bundle = new Bundle();
-        bundle.putSerializable("photoMarker", photoMarker);
-
-        PhotoInfoFragment infoFragment = new PhotoInfoFragment();
-        infoFragment.setArguments(bundle);
-
-        FragmentManager fm = getFragmentManager();
-
-        removeInfoFrag(fm);
-
-        fm.beginTransaction()
-                .setCustomAnimations(R.animator.slide_up, R.animator.slide_down, R.animator.slide_up, R.animator.slide_down)
-                .add(R.id.maps_activity, infoFragment, "photoInfoFragment")
-                .addToBackStack(null)
-                .commit();
+        addInfoFragment(photoMarker);
 
         final Marker m = renderer.getMarker(photoMarker);
+        m.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
         m.showInfoWindow();
+
+        if (!photoMarker.equals(lastActiveMarker)) {
+            Marker lastMarker = renderer.getMarker(lastActiveMarker);
+            if (lastMarker != null)
+                lastMarker.setIcon(BitmapDescriptorFactory.defaultMarker());
+        }
 
         //pan camera to marker position
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLng(m.getPosition());
@@ -151,19 +141,44 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
     }
 
     public boolean onClusterClick(Cluster cluster) {
-        Collection<PhotoMarker> markerCollection = cluster.getItems();
-        renderer.getMarker(cluster).showInfoWindow();
-        return false;
+        ArrayList<PhotoMarker> markerArrayList = new ArrayList(cluster.getItems());
+        Bundle bundle = new Bundle();
+        bundle.putParcelableArrayList("markerArrayList", markerArrayList);
+
+        PhotoListFragment photoListFragment = new PhotoListFragment();
+        photoListFragment.setArguments(bundle);
+
+        ActionBar actionBar = getSupportActionBar();
+        actionBar.show();
+        actionBar.setBackgroundDrawable(new ColorDrawable(0xffffffff));
+        removeInfoFragment();
+
+        FragmentManager fm = getFragmentManager();
+        FragmentTransaction transaction = fm.beginTransaction();
+
+        transaction.setCustomAnimations(R.animator.slide_up, 0, 0, R.animator.slide_down)
+                .add(R.id.maps_activity, photoListFragment, "photoListFragment")
+                .addToBackStack(null)
+                .commit();
+
+        //renderer.getMarker(cluster).showInfoWindow();
+        return true;
     }
 
     public void onMapClick(LatLng latLng) {
-        ActionBar bar = getActionBar();
+        ActionBar bar = getSupportActionBar();
         if(bar.isShowing())
             bar.hide();
         else
             bar.show();
 
-        removeInfoFrag(getFragmentManager());
+        Marker lastMarker = renderer.getMarker(lastActiveMarker);
+        if (lastMarker != null) {
+            lastMarker.setIcon(BitmapDescriptorFactory.defaultMarker());
+            lastActiveMarker = null;
+        }
+
+        removeInfoFragment();
     }
 
     public void onCameraChange(CameraPosition cameraPosition) {
@@ -173,10 +188,13 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
 
             if (m != null) {
                 m.hideInfoWindow();
-                removeInfoFrag(getFragmentManager());
+                m.setIcon(BitmapDescriptorFactory.defaultMarker());
+                removeInfoFragment();
+            } else if (lastActiveNonClusteredMarker != null) {
+                removeInfoFragment();
             }
 
-            ActionBar actionBar = getActionBar();
+            ActionBar actionBar = getSupportActionBar();
             if (actionBar != null)
                 actionBar.hide();
         }
@@ -186,61 +204,66 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
     }
 
     @Override
+    public void onPhotoListItemClick(PhotoMarker photoMarker) {
+        FragmentManager fm = getFragmentManager();
+        Fragment listFragment = fm.findFragmentByTag("photoListFragment");
+        Fragment mapFragment = fm.findFragmentById(R.id.map);
+
+        if (listFragment != null) {
+            /*
+            fm.beginTransaction().setCustomAnimations(0, R.animator.slide_down)
+                    .remove(listFragment)
+                    .commit();
+                    */
+            fm.popBackStackImmediate();
+        }
+
+        Marker marker = gMap.addMarker(new MarkerOptions()
+                .position(photoMarker.getPosition())
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+
+        addInfoFragment(photoMarker);
+
+        //pan camera to marker position
+        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLng(photoMarker.getPosition());
+        gMap.animateCamera(cameraUpdate, 500, null);
+
+        lastActiveNonClusteredMarker = marker;
+    }
+
+    @Override
     public void onBackPressed() {
+
+        if (lastActiveNonClusteredMarker != null) {
+            lastActiveNonClusteredMarker.remove();
+            lastActiveNonClusteredMarker = null;
+        }
 
         Marker m = renderer.getMarker(lastActiveMarker);
 
         if(m != null) {
             m.hideInfoWindow();
+            m.setIcon(BitmapDescriptorFactory.defaultMarker());
         }
 
-        ActionBar actionBar = getActionBar();
+        ActionBar actionBar = getSupportActionBar();
+
         if(actionBar != null)
+            actionBar.setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.translucent_white)));
             actionBar.hide();
 
-        super.onBackPressed();
-    }
-
-    private class LoadPhotosTask extends AsyncTask<Void, Void, Void> {
-
-        protected Void doInBackground(Void... params) {
-            Queue<File> dirs = new LinkedList<File>();
-
-            dirs.add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM));
-            ExifInterface exifInterface;
-
-            while (!dirs.isEmpty()) {
-                File[] files = dirs.remove().listFiles();
-
-                for (int i = 0; i < files.length; i++) {
-
-                    if (files[i].isDirectory()) {
-                        dirs.add(files[i]);
-                        continue;
-                    }
-
-                    try {
-                        //load latitude/longitude coordinates from EXIF data
-                        exifInterface = new ExifInterface(files[i].getAbsolutePath());
-                        float[] latLon = new float[2];
-
-                        if (exifInterface.getLatLong(latLon)) {
-                            PhotoMarker m = new PhotoMarker(latLon[0], latLon[1], files[i]);
-                            clusterManager.addItem(m);
-                        }
-
-                    } catch (IOException e) {
-                        Log.e(TAG, "IO exception when loading photo");
-                    }
-
-                }
-            }
-            return null;
+        // Force checking the native fragment manager for a backstack rather than
+        // the support lib fragment manager.
+        if (!getFragmentManager().popBackStackImmediate()) {
+            super.onBackPressed();
         }
 
-        protected void onPostExecute(Void aVoid) {
-            clusterManager.cluster();
-        }
+        Fragment mapFragment = getFragmentManager().findFragmentById(R.id.map);
+
+        if (mapFragment == null)
+            Log.d(TAG, "map fragment is null");
+        else
+            Log.d(TAG, "map fragment hidden: " + mapFragment.isHidden());
     }
 
     public class PhotoInfoWindowAdapter implements GoogleMap.InfoWindowAdapter {
@@ -287,36 +310,8 @@ public class MapsActivity extends Activity implements ClusterManager.OnClusterIt
 
                         }
                     });
-            //new LoadBitmapTask(marker).execute(pm);
 
             return actualView;
-        }
-
-        private class LoadBitmapTask extends AsyncTask<PhotoMarker, Void, Bitmap> {
-
-            private Marker marker;
-
-            public LoadBitmapTask(Marker m) {
-                super();
-                marker = m;
-            }
-
-            protected Bitmap doInBackground(PhotoMarker... params) {
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = 4; //TODO calculate for screen size
-
-                return BitmapFactory.decodeFile(params[0].getFile().getPath(), options);
-            }
-
-            @Override
-            protected void onPostExecute(Bitmap bitmap) {
-
-                //check that marker is still active before trying to display
-                if(marker.isInfoWindowShown()) {
-                    actualView.setImageBitmap(bitmap);
-                    marker.showInfoWindow();
-                }
-            }
         }
     }
 

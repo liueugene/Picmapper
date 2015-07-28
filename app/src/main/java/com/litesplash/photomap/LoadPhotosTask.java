@@ -20,9 +20,11 @@ import java.util.Queue;
 class LoadPhotosTask extends AsyncTask<Void, Void, Void> {
 
     private WeakReference<ClusterManager<PhotoMarker>> clusterManagerRef;
+    private OnPhotosReadyListener listener;
 
-    public LoadPhotosTask(ClusterManager<PhotoMarker> clusterManager) {
+    public LoadPhotosTask(ClusterManager<PhotoMarker> clusterManager, OnPhotosReadyListener listener) {
         clusterManagerRef = new WeakReference<ClusterManager<PhotoMarker>>(clusterManager);
+        this.listener = listener;
     }
 
     protected Void doInBackground(Void... params) {
@@ -73,7 +75,16 @@ class LoadPhotosTask extends AsyncTask<Void, Void, Void> {
 
         ClusterManager<PhotoMarker> clusterManager = clusterManagerRef.get();
 
-        if (clusterManager != null)
+        if (clusterManager != null) {
             clusterManager.cluster();
+        }
+
+        if (listener != null) {
+            listener.onPhotosReady();
+        }
+    }
+
+    public interface OnPhotosReadyListener {
+        void onPhotosReady();
     }
 }

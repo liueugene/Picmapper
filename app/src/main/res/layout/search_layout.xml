@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="fill_horizontal">
+
+    <com.litesplash.photomap.DelayAutoCompleteTextView
+        android:id="@+id/search_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_toLeftOf="@+id/clear_search"
+        android:layout_alignParentLeft="true"
+        android:maxWidth="320dp"
+        android:background="@null"
+        android:hint="@string/search_places_hint"
+        android:imeOptions="actionSearch"
+        android:inputType="text" />
+
+    <ImageView
+        android:id="@+id/clear_search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_alignParentRight="true"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:src="@drawable/ic_close_black_24dp" />
+
+</RelativeLayout>

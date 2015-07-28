@@ -1,33 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent"
-    android:layout_height="?android:attr/listPreferredItemHeight"
-    android:background="?android:selectableItemBackground"
+<com.litesplash.photomap.CustomRelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:foreground="?android:selectableItemBackground"
     android:clickable="true"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp"
-    android:paddingLeft="16dp"
-    android:paddingRight="16dp" >
+    android:layout_margin="2dp">
 
     <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="@dimen/photo_grid_item_size"
+        android:layout_height="@dimen/photo_grid_item_size"
         android:id="@+id/list_photo_view"
-        android:layout_centerVertical="true"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true" />
+        android:layout_marginBottom="2dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Large Text"
-        android:id="@+id/list_filename_text"
-        android:layout_centerVertical="true"
-        android:layout_toRightOf="@+id/list_photo_view"
-        android:layout_toEndOf="@+id/list_photo_view"
-        android:layout_marginLeft="16dp"
-        android:layout_marginStart="16dp" />
+        android:layout_below="@id/list_photo_view"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:fontFamily="sans-serif-condensed"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:id="@+id/list_filename_text" />
 
-
-</RelativeLayout>
+</com.litesplash.photomap.CustomRelativeLayout>

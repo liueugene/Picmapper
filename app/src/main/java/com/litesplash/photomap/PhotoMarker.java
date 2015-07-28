@@ -76,6 +76,7 @@ public class PhotoMarker implements ClusterItem, Parcelable {
         }
     };
 
+    @Override
     public boolean equals(Object o) {
         if (!(o instanceof PhotoMarker))
             return false;
@@ -83,5 +84,17 @@ public class PhotoMarker implements ClusterItem, Parcelable {
         PhotoMarker other = (PhotoMarker) o;
 
         return (latitude == other.latitude  &&  longitude == other.longitude  &&  filePath.equals(other.filePath));
+    }
+
+    @Override
+    public int hashCode() {
+        int result;
+        long temp;
+        temp = Double.doubleToLongBits(latitude);
+        result = (int) (temp ^ (temp >>> 32));
+        temp = Double.doubleToLongBits(longitude);
+        result = 31 * result + (int) (temp ^ (temp >>> 32));
+        result = 31 * result + filePath.hashCode();
+        return result;
     }
 }

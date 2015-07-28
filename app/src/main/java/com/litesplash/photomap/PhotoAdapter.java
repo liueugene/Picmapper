@@ -8,7 +8,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.squareup.picasso.Picasso;
 
@@ -26,11 +25,13 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> 
     private ArrayList<PhotoMarker> markers;
     private Context context;
     private OnItemClickListener listener;
+    private int photoSize;
 
     public PhotoAdapter(ArrayList<PhotoMarker> markers, Context context, OnItemClickListener listener) {
         this.markers = markers;
         this.context = context;
         this.listener = listener;
+        photoSize = context.getResources().getDimensionPixelSize(R.dimen.photo_grid_item_size);
     }
 
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -48,7 +49,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> 
                 .load(photoFile)
                 .placeholder(gDrawable)
                 .tag(LOAD_PHOTO_TAG)
-                .resize(256, 256) //TODO implement proper resize
+                .resize(photoSize, photoSize)
                 .centerCrop()
                 .into(holder.photoView);
     }
@@ -57,7 +58,7 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> 
         return markers.size();
     }
 
-    public class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
 
         ImageView photoView;
         TextView filenameText;

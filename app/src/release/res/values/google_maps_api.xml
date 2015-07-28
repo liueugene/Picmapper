@@ -1,17 +1,4 @@
 <resources>
-    <!--
-    TODO: Before you run your application, you need a Google Maps API key.
-
-    To get one, follow this link, follow the directions and press "Create" at the end:
-
-https://console.developers.google.com/flows/enableapi?apiid=maps_android_backend&keyType=CLIENT_SIDE_ANDROID&r=D8:E3:69:BE:8F:01:E2:1E:F5:07:11:52:C7:5E:D5:35:16:BC:32:F1%3Bcom.litesplash.photomap
-
-    You can also add your credentials to an existing key, using this line:
-    D8:E3:69:BE:8F:01:E2:1E:F5:07:11:52:C7:5E:D5:35:16:BC:32:F1;com.litesplash.photomap
-
-    Once you have your key (it starts with "AIza"), replace the "google_maps_key"
-    string in this file.
-    -->
     <string name="google_maps_key" translatable="false" templateMergeStrategy="preserve">
         YOUR_KEY_HERE
     </string>

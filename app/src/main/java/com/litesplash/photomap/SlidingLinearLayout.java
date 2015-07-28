@@ -4,27 +4,27 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 /**
- * Created by Eugene on 7/8/2015.
+ * Created by Eugene on 7/23/2015.
  */
-public class SlidingFrameLayout extends FrameLayout {
+public class SlidingLinearLayout extends LinearLayout {
 
-    public SlidingFrameLayout(Context context) {
+    public SlidingLinearLayout(Context context) {
         super(context);
     }
 
-    public SlidingFrameLayout(Context context, AttributeSet attrs) {
+    public SlidingLinearLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public SlidingFrameLayout(Context context, AttributeSet attrs, int defStyleAttr) {
+    public SlidingLinearLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public SlidingFrameLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    public SlidingLinearLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
 

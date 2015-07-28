@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">PhotoMap</string>
-    <string name="title_activity_maps">MapActivity</string>
+    <string name="title_activity_maps">Map View</string>
     <string name="preference_file_key">com.litesplash.photomap.pref_file_key</string>
+    <string name="action_search">Search places</string>
+    <string name="search_places_hint">Search places</string>
+    <string name="loading_text">Loading photo locations&#8230;</string>
 </resources>

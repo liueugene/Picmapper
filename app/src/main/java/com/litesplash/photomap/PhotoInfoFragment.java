@@ -3,27 +3,25 @@ package com.litesplash.photomap;
 import android.animation.Animator;
 import android.animation.AnimatorInflater;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Fragment;
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
+import android.content.res.Configuration;
 import android.location.Address;
 import android.location.Geocoder;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.animation.AccelerateDecelerateInterpolator;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
@@ -32,19 +30,21 @@ import com.squareup.picasso.Target;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
-public class PhotoInfoFragment extends Fragment implements View.OnTouchListener {
+public class PhotoInfoFragment extends Fragment implements View.OnTouchListener, AnimImageView.OnReadyToAnimateListener {
 
     private static final int[] GRADIENT_COLORS = {0xFFF5F5F5, 0xFFEEEEEE};
     private static final String PHOTO_MARKER_TAG = "photoMarker";
+    private static final int MAX_PHOTO_SIZE = 360;
 
     private AnimImageView imageView;
     private File file;
 
-    private static int animDuration;
+    private int animDuration;
+
     private Context context;
     private float fingerOffset;
+    private float initY;
 
     public PhotoInfoFragment() {
         // Required empty public constructor
@@ -77,9 +77,11 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener 
     }
 
     //private updater that can be called by onCreateView, passing in view to inflate as parameter
-    private void updateInfo(View infoOverlayView, Bundle bundle) {
+    private void updateInfo(final View infoOverlayView, Bundle bundle) {
 
         imageView = (AnimImageView) infoOverlayView.findViewById(R.id.info_imageview);
+        imageView.setOnReadyToAnimateListener(this);
+
         TextView filename = (TextView) infoOverlayView.findViewById(R.id.filename);
         TextView latData = (TextView) infoOverlayView.findViewById(R.id.latitude_data_text);
         TextView lonData = (TextView) infoOverlayView.findViewById(R.id.longitude_data_text);
@@ -89,23 +91,35 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener 
         file = pm.getFile();
 
         //load image after view is drawn so that it can be resized appropriately
-        imageView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+        infoOverlayView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
 
                 //remove listener to prevent unnecessary future calls
                 //method call is version dependent
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN)
-                    imageView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    infoOverlayView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
                 else
-                    imageView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                    infoOverlayView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
 
-                int width = Math.max(imageView.getMeasuredWidth(), 2);
-                Log.d(MapsActivity.TAG, "the measured width is " + width);
+
+                DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+                int maxPhotoSize = Util.dpToPx(MAX_PHOTO_SIZE, displayMetrics);
+                int width, height;
+
+                if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    int viewWidth = infoOverlayView.getMeasuredWidth() - infoOverlayView.getPaddingLeft() - infoOverlayView.getPaddingRight();
+                    width = Math.min(viewWidth, maxPhotoSize);
+                    height = displayMetrics.heightPixels / 2;
+                } else {
+                    int viewHeight = infoOverlayView.getMeasuredHeight() - infoOverlayView.getPaddingTop() - infoOverlayView.getPaddingBottom();
+                    width = displayMetrics.widthPixels / 2;
+                    height = Math.min(viewHeight, maxPhotoSize);
+                }
 
                 Picasso.with(context)
                         .load(file)
-                        .resize(width, width)
+                        .resize(width, height)
                         .onlyScaleDown()
                         .centerInside()
                         .noFade()
@@ -122,18 +136,18 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener 
 
     @Override
     public Animator onCreateAnimator(int transit, boolean enter, int nextAnim) {
-
-        final Animator anim = AnimatorInflater.loadAnimator(context, nextAnim);
+        //note: don't use nextAnim as the animation resource is not saved on activity recreation (orientation change)
 
         if (!enter)
-            return anim;
+            return AnimatorInflater.loadAnimator(context, R.animator.slide_down);
 
-        //only show photo after enter animation
+        //only add listener to show photo when fragment is entering
+        Animator anim = AnimatorInflater.loadAnimator(context, R.animator.slide_up);
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 Log.d(MapsActivity.TAG, "onAnimationEnd was called");
-                imageView.setFragmentReady();
+                imageView.setLayoutReady();
             }
         });
 
@@ -143,16 +157,17 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener 
     public boolean onTouch(View v, MotionEvent event) {
 
         switch (event.getAction()) {
-
             case MotionEvent.ACTION_DOWN:
-                float initY = event.getRawY();
+                initY = event.getRawY();
                 fingerOffset = initY - v.getTop();
                 Log.d(MapsActivity.TAG, "finger offset " + fingerOffset);
+                break;
 
             case MotionEvent.ACTION_MOVE:
                 float yPos = event.getRawY();
 //                Log.d(MapsActivity.TAG, "touch at y coordinate " + yPos);
-                v.setY(yPos - fingerOffset);
+                if (yPos - initY > 0)
+                    v.setY(yPos - fingerOffset);
                 break;
 
             case MotionEvent.ACTION_UP:
@@ -165,6 +180,51 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener 
         }
 
         return true;
+    }
+
+    @Override
+    public void onReadyToAnimate(int bitmapWidth, int bitmapHeight) {
+
+        AnimatorSet animSet = new AnimatorSet();
+        ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(imageView, "alpha", 0f, 1f);
+        fadeAnim.setDuration(animDuration);
+
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+            ValueAnimator heightAnim = ValueAnimator.ofInt(0, bitmapHeight);
+            heightAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    int curHeight = (int) animation.getAnimatedValue();
+                    ViewGroup.LayoutParams layoutParams = imageView.getLayoutParams();
+                    layoutParams.height = curHeight;
+                    imageView.setLayoutParams(layoutParams);
+                }
+            });
+
+            heightAnim.setDuration(animDuration);
+            animSet.play(heightAnim).with(fadeAnim);
+
+        } else {
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) imageView.getLayoutParams();
+            params.leftMargin = Util.dpToPx(10, getResources().getDisplayMetrics());
+            imageView.setLayoutParams(params);
+
+            ValueAnimator widthAnim = ValueAnimator.ofInt(0, bitmapWidth);
+            widthAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    int curImageWidth = (int) animation.getAnimatedValue();
+
+                    ViewGroup.LayoutParams imageLayoutParams = imageView.getLayoutParams();
+                    imageLayoutParams.width = curImageWidth;
+                    imageView.setLayoutParams(imageLayoutParams);
+                }
+            });
+            widthAnim.setDuration(animDuration);
+            animSet.play(widthAnim).with(fadeAnim);
+        }
+
+        animSet.start();
     }
 
     private class ReverseGeocodeTask extends AsyncTask<Double, Void, String> {

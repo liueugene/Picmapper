@@ -1,15 +1,10 @@
 package com.litesplash.photomap;
 
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ImageView;
 
 import com.squareup.picasso.Picasso;
@@ -22,19 +17,26 @@ public class AnimImageView extends ImageView implements Target {
 
     private static int animDuration;
     private int height;
+    private int width;
     private boolean bitmapLoaded;
-    private boolean fragmentReady;
+    private boolean layoutReady;
+
+    private OnReadyToAnimateListener listener;
 
     public AnimImageView(Context context) {
-        super(context);
+        this(context, null, 0);
     }
 
     public AnimImageView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
     }
 
     public AnimImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+    }
+
+    public void setOnReadyToAnimateListener(OnReadyToAnimateListener listener) {
+        this.listener = listener;
     }
 
     @Override
@@ -43,11 +45,13 @@ public class AnimImageView extends ImageView implements Target {
         setVisibility(GONE);
         setImageBitmap(bitmap);
         height = bitmap.getHeight();
+        width = bitmap.getWidth();
         Log.d(MapsActivity.TAG, "onBitmapLoaded bitmap height: " + height);
+        Log.d(MapsActivity.TAG, "onBitmapLoaded bitmap width: " + width);
 
         bitmapLoaded = true;
 
-        if (fragmentReady)
+        if (layoutReady)
             animatePhotoIntoView();
     }
 
@@ -61,39 +65,21 @@ public class AnimImageView extends ImageView implements Target {
 
     }
 
-    public void setFragmentReady() {
-        fragmentReady = true;
+    public void setLayoutReady() {
+        layoutReady = true;
 
         if (bitmapLoaded)
             animatePhotoIntoView();
     }
 
     public void animatePhotoIntoView() {
-
         setVisibility(VISIBLE);
 
-        animDuration = getResources().getInteger(android.R.integer.config_mediumAnimTime);
+        if (listener != null)
+            listener.onReadyToAnimate(width, height);
+    }
 
-        Log.d(MapsActivity.TAG, "animatePhotoIntoView bitmap height: " + height);
-
-        ValueAnimator heightAnim = ValueAnimator.ofInt(0, height);
-        heightAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                int curHeight = (Integer) animation.getAnimatedValue();
-                ViewGroup.LayoutParams layoutParams = getLayoutParams();
-                layoutParams.height = curHeight;
-                setLayoutParams(layoutParams);
-            }
-        });
-
-        heightAnim.setDuration(animDuration);
-
-        ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(this, "alpha", 0f, 1f);
-        fadeAnim.setDuration(animDuration);
-
-        AnimatorSet animSet = new AnimatorSet();
-        animSet.play(heightAnim).with(fadeAnim);
-        animSet.start();
+    public interface OnReadyToAnimateListener {
+        void onReadyToAnimate(int bitmapWidth, int bitmapHeight);
     }
 }

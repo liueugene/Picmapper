@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,7 +25,6 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
     private ArrayList<PhotoMarker> markerArrayList;
 
     private RecyclerView recyclerView;
-    private RecyclerView.LayoutManager layoutManager;
     private RecyclerView.Adapter adapter;
 
     /**
@@ -64,10 +62,7 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
                              Bundle savedInstanceState) {
 
         View v = inflater.inflate(R.layout.cluster_list_fragment, container, false);
-        recyclerView = (RecyclerView) v.findViewById(R.id.photo_recycler_view);
-
-        layoutManager = new LinearLayoutManager(context);
-        recyclerView.setLayoutManager(layoutManager);
+        recyclerView = (AutoFitRecyclerView) v.findViewById(R.id.photo_recycler_view);
 
         adapter = new PhotoAdapter(markerArrayList, context, this);
 

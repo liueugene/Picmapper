@@ -28,7 +28,6 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
@@ -58,7 +57,7 @@ import com.google.maps.android.clustering.ClusterManager;
 import java.util.ArrayList;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, ClusterManager.OnClusterItemClickListener<PhotoMarker>,
-        ClusterManager.OnClusterClickListener, GoogleMap.OnMapClickListener, GoogleMap.OnCameraChangeListener, PhotoListFragment.PhotoListItemClickListener,
+        ClusterManager.OnClusterClickListener, GoogleMap.OnMapClickListener, GoogleMap.OnCameraChangeListener, PhotoListFragment.PhotoListFragmentListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     protected static final String TAG = "PhotoMap";
@@ -71,6 +70,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private ClusterManager<PhotoMarker> clusterManager;
     private CustomClusterRenderer<PhotoMarker> renderer;
 
+    private ArrayList<PhotoMarker> allMarkers;
+
     private PlacesSuggestionAdapter searchAdapter;
 
     private PhotoMarker lastActiveMarker;
@@ -81,7 +82,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private MenuItem searchMenuItem;
     private AutoCompleteTextView searchView;
-    private FrameLayout mapFrame;
     private RelativeLayout activityLayout;
     private RelativeLayout progressLayout;
     private ProgressBar progressBar;
@@ -109,11 +109,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         setSupportActionBar(toolbar);
 
-        ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
-
         if (savedInstanceState != null) {
             lastActiveMarker = savedInstanceState.getParcelable("lastActiveMarker");
+            allMarkers = savedInstanceState.getParcelableArrayList("allMarkers");
         }
+
+        ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
     }
 
     @Override
@@ -165,8 +166,17 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onStart() {
+        super.onStart();
+
+        googleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .build();
+        googleApiClient.connect();
     }
 
     @Override
@@ -180,9 +190,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     protected void onSaveInstanceState(Bundle outState) {
 
-        if (lastActiveMarker != null) {
-            outState.putParcelable("lastActiveMarker", lastActiveMarker);
-        }
+        outState.putParcelable("lastActiveMarker", lastActiveMarker);
+        outState.putParcelableArrayList("allMarkers", allMarkers);
+
         super.onSaveInstanceState(outState);
     }
 
@@ -226,9 +236,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         clusterManager.setOnClusterClickListener(this);
 //        clusterManager.getMarkerCollection().setOnInfoWindowAdapter(new PhotoInfoWindowAdapter());
 
-        new LoadPhotosTask(clusterManager, new LoadPhotosTask.OnPhotosReadyListener() {
+        new LoadPhotosTask(clusterManager, allMarkers, new LoadPhotosTask.Callback() {
             @Override
-            public void onPhotosReady() {
+            public void onPhotosReady(ArrayList<PhotoMarker> markers) {
                 ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(progressLayout, "alpha", progressLayout.getAlpha(), 0f);
                 fadeAnim.setDuration(500);
                 fadeAnim.addListener(new AnimatorListenerAdapter() {
@@ -238,17 +248,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     }
                 });
                 fadeAnim.start();
+
+                if (markers == null)
+                    allMarkers = markers;
             }
         }).execute();
-
-        googleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .addApi(Places.GEO_DATA_API)
-                .addApi(Places.PLACE_DETECTION_API)
-                .build();
-        googleApiClient.connect();
     }
 
     private void zoomToCurrentLocation() {
@@ -485,6 +489,26 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         gMap.animateCamera(cameraUpdate, 500, null);
 
         lastActiveNonClusteredMarker = marker;
+    }
+
+    @Override
+    public void onPhotoListFragmentShown() {
+        FragmentManager fm = getFragmentManager();
+        MapFragment mapFragment = (MapFragment) fm.findFragmentById(R.id.map);
+
+        if (mapFragment != null) {
+            fm.beginTransaction().hide(mapFragment).commit();
+        }
+    }
+
+    @Override
+    public void onPhotoListFragmentHidden() {
+        FragmentManager fm = getFragmentManager();
+        MapFragment mapFragment = (MapFragment) fm.findFragmentById(R.id.map);
+
+        if (mapFragment != null) {
+            fm.beginTransaction().show(mapFragment).commit();
+        }
     }
 
     @Override

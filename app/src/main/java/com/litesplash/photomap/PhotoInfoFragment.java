@@ -7,11 +7,8 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Fragment;
-import android.content.Context;
 import android.content.res.Configuration;
-import android.location.Address;
 import android.location.Geocoder;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
@@ -28,10 +25,8 @@ import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.List;
 
-public class PhotoInfoFragment extends Fragment implements View.OnTouchListener, AnimImageView.OnReadyToAnimateListener {
+public class PhotoInfoFragment extends Fragment implements View.OnTouchListener, AnimImageView.Callback {
 
     private static final int[] GRADIENT_COLORS = {0xFFF5F5F5, 0xFFEEEEEE};
     private static final String PHOTO_MARKER_TAG = "photoMarker";
@@ -42,7 +37,6 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
 
     private int animDuration;
 
-    private Context context;
     private float fingerOffset;
     private float initY;
 
@@ -65,7 +59,6 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
         View infoOverlay = inflater.inflate(R.layout.photo_info_fragment, container, false);
         infoOverlay.setOnTouchListener(this);
 
-        context = infoOverlay.getContext();
         animDuration = getResources().getInteger(android.R.integer.config_mediumAnimTime);
         updateInfo(infoOverlay, getArguments());
         return infoOverlay;
@@ -85,7 +78,7 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
         TextView filename = (TextView) infoOverlayView.findViewById(R.id.filename);
         TextView latData = (TextView) infoOverlayView.findViewById(R.id.latitude_data_text);
         TextView lonData = (TextView) infoOverlayView.findViewById(R.id.longitude_data_text);
-        TextView locText = (TextView) infoOverlayView.findViewById(R.id.location_text);
+        final TextView locText = (TextView) infoOverlayView.findViewById(R.id.location_text);
 
         PhotoMarker pm = bundle.getParcelable("photoMarker");
         file = pm.getFile();
@@ -117,7 +110,7 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
                     height = Math.min(viewHeight, maxPhotoSize);
                 }
 
-                Picasso.with(context)
+                Picasso.with(getActivity())
                         .load(file)
                         .resize(width, height)
                         .onlyScaleDown()
@@ -131,7 +124,14 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
         latData.setText(String.format("%.5f", pm.getLatitude()));
         lonData.setText(String.format("%.5f", pm.getLongitude()));
 
-        new ReverseGeocodeTask(locText).execute(pm.getLatitude(), pm.getLongitude());
+        new ReverseGeocodeTask(new Geocoder(getActivity()), new ReverseGeocodeTask.Callback() {
+            @Override
+            public void onLocationFound(String location) {
+                locText.setAlpha(0);
+                locText.setText(location);
+                locText.animate().alpha(1).setDuration(animDuration);
+            }
+        }).execute(pm.getLatitude(), pm.getLongitude());
     }
 
     @Override
@@ -139,10 +139,10 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
         //note: don't use nextAnim as the animation resource is not saved on activity recreation (orientation change)
 
         if (!enter)
-            return AnimatorInflater.loadAnimator(context, R.animator.slide_down);
+            return AnimatorInflater.loadAnimator(getActivity(), R.animator.slide_down);
 
         //only add listener to show photo when fragment is entering
-        Animator anim = AnimatorInflater.loadAnimator(context, R.animator.slide_up);
+        Animator anim = AnimatorInflater.loadAnimator(getActivity(), R.animator.slide_up);
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -227,52 +227,4 @@ public class PhotoInfoFragment extends Fragment implements View.OnTouchListener,
         animSet.start();
     }
 
-    private class ReverseGeocodeTask extends AsyncTask<Double, Void, String> {
-
-        private TextView locText;
-
-        public ReverseGeocodeTask(TextView locText) {
-            super();
-            this.locText = locText;
-        }
-
-        protected String doInBackground(Double... params) {
-            double latitude = params[0];
-            double longitude = params[1];
-            Geocoder geocoder = new Geocoder(context);
-            String locationStr = null;
-
-            try {
-                List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-
-                if (addresses == null || addresses.isEmpty())
-                    return "Unknown location";
-
-                Address addr = addresses.get(0);
-
-                String city = addr.getLocality();
-                String state = addr.getAdminArea();
-                String zip = addr.getPostalCode();
-
-                locationStr = (city == null) ? "" : city + ", ";
-                locationStr += (state == null) ? "" : state + " ";
-                locationStr += (zip == null) ? "" : zip;
-
-            } catch (IOException e) {
-                Log.e(MapsActivity.TAG, "IO exception when reverse geocoding latLon " + latitude + ", " + longitude);
-            }
-
-            if(locationStr == null || locationStr.isEmpty())
-                locationStr = "Unknown location";
-
-            return locationStr;
-        }
-
-        @Override
-        protected void onPostExecute(String locationStr) {
-            locText.setAlpha(0);
-            locText.setText(locationStr);
-            locText.animate().alpha(1).setDuration(animDuration);
-        }
-    }
 }

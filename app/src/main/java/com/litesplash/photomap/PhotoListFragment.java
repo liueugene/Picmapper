@@ -1,5 +1,8 @@
 package com.litesplash.photomap;
 
+import android.animation.Animator;
+import android.animation.AnimatorInflater;
+import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
@@ -21,7 +24,7 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
     private static final String LOAD_PHOTO_TAG = "loadPhoto";
 
     private Context context;
-    private PhotoListItemClickListener listener;
+    private PhotoListFragmentListener listener;
     private ArrayList<PhotoMarker> markerArrayList;
 
     private RecyclerView recyclerView;
@@ -85,13 +88,38 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
     }
 
     @Override
+    public Animator onCreateAnimator(int transit, boolean enter, int nextAnim) {
+
+        Animator anim;
+
+        if (enter) {
+            anim = AnimatorInflater.loadAnimator(getActivity(), R.animator.slide_up);
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    listener.onPhotoListFragmentShown();
+                }
+            });
+        } else {
+            anim = AnimatorInflater.loadAnimator(getActivity(), R.animator.slide_down);
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    listener.onPhotoListFragmentHidden();
+                }
+            });
+        }
+        return anim;
+    }
+
+    @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
         try {
-            listener = (PhotoListItemClickListener) activity;
+            listener = (PhotoListFragmentListener) activity;
         } catch (ClassCastException e) {
             throw new ClassCastException(activity.toString()
-                    + " must implement PhotoListItemClickListener");
+                    + " must implement PhotoListFragmentListener");
         }
     }
 
@@ -107,7 +135,9 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
         listener.onPhotoListItemClick(pm);
     }
 
-    public interface PhotoListItemClickListener {
+    public interface PhotoListFragmentListener {
         void onPhotoListItemClick(PhotoMarker photoMarker);
+        void onPhotoListFragmentShown();
+        void onPhotoListFragmentHidden();
     }
 }

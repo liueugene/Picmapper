@@ -15,13 +15,12 @@ import com.squareup.picasso.Target;
  */
 public class AnimImageView extends ImageView implements Target {
 
-    private static int animDuration;
     private int height;
     private int width;
     private boolean bitmapLoaded;
     private boolean layoutReady;
 
-    private OnReadyToAnimateListener listener;
+    private Callback callback;
 
     public AnimImageView(Context context) {
         this(context, null, 0);
@@ -35,8 +34,8 @@ public class AnimImageView extends ImageView implements Target {
         super(context, attrs, defStyleAttr);
     }
 
-    public void setOnReadyToAnimateListener(OnReadyToAnimateListener listener) {
-        this.listener = listener;
+    public void setOnReadyToAnimateListener(Callback callback) {
+        this.callback = callback;
     }
 
     @Override
@@ -75,11 +74,11 @@ public class AnimImageView extends ImageView implements Target {
     public void animatePhotoIntoView() {
         setVisibility(VISIBLE);
 
-        if (listener != null)
-            listener.onReadyToAnimate(width, height);
+        if (callback != null)
+            callback.onReadyToAnimate(width, height);
     }
 
-    public interface OnReadyToAnimateListener {
+    public interface Callback {
         void onReadyToAnimate(int bitmapWidth, int bitmapHeight);
     }
 }

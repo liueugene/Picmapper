@@ -20,18 +20,20 @@ import java.util.ArrayList;
 public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> {
 
     private static final String LOAD_PHOTO_TAG = "loadPhoto";
-    private static final int[] GRADIENT_COLORS = {0xFFF5F5F5, 0xFFEEEEEE};
+    private static final int[] GRADIENT_COLORS = {0xFFF5F5F5, 0xFFE0E0E0};
 
     private ArrayList<PhotoMarker> markers;
     private Context context;
     private OnItemClickListener listener;
     private int photoSize;
+    private GradientDrawable placeholder;
 
     public PhotoAdapter(ArrayList<PhotoMarker> markers, Context context, OnItemClickListener listener) {
         this.markers = markers;
         this.context = context;
         this.listener = listener;
         photoSize = context.getResources().getDimensionPixelSize(R.dimen.photo_grid_item_size);
+        placeholder = new GradientDrawable(GradientDrawable.Orientation.TL_BR, GRADIENT_COLORS);
     }
 
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -43,11 +45,9 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> 
         File photoFile = markers.get(position).getFile();
         holder.filenameText.setText(photoFile.getName());
 
-        GradientDrawable gDrawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR, GRADIENT_COLORS);
-
         Picasso.with(context)
                 .load(photoFile)
-                .placeholder(gDrawable)
+                .placeholder(placeholder)
                 .tag(LOAD_PHOTO_TAG)
                 .resize(photoSize, photoSize)
                 .centerCrop()

@@ -34,7 +34,7 @@ public class AnimImageView extends ImageView implements Target {
         super(context, attrs, defStyleAttr);
     }
 
-    public void setOnReadyToAnimateListener(Callback callback) {
+    public void setOnReadyToAnimateCallback(Callback callback) {
         this.callback = callback;
     }
 
@@ -45,8 +45,8 @@ public class AnimImageView extends ImageView implements Target {
         setImageBitmap(bitmap);
         height = bitmap.getHeight();
         width = bitmap.getWidth();
-        Log.d(MapsActivity.TAG, "onBitmapLoaded bitmap height: " + height);
-        Log.d(MapsActivity.TAG, "onBitmapLoaded bitmap width: " + width);
+        Log.d(MainActivity.TAG, "onBitmapLoaded bitmap height: " + height);
+        Log.d(MainActivity.TAG, "onBitmapLoaded bitmap width: " + width);
 
         bitmapLoaded = true;
 

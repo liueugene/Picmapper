@@ -5,4 +5,9 @@
         <attr name="android:foregroundInsidePadding" />
         <attr name="android:foregroundGravity" />
     </declare-styleable>
+
+    <declare-styleable name="SlideUpPanelLayout">
+        <attr name="backgroundView" format="reference" />
+        <attr name="panelView" format="reference" />
+    </declare-styleable>
 </resources>

@@ -8,21 +8,22 @@ import com.google.maps.android.clustering.ClusterItem;
 
 import java.io.File;
 
-public class PhotoMarker implements ClusterItem, Parcelable {
+public class PhotoItem implements ClusterItem, Parcelable {
     private final double latitude;
     private final double longitude;
+    private int filenameIndex;
     private String filePath;
 
-    public PhotoMarker(double lat, double lng, String f) {
-        latitude = lat;
-        longitude = lng;
-        filePath = f;
+    public PhotoItem(double latitude, double longitude, String filePath) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.filePath = filePath;
+
+        filenameIndex = filePath.lastIndexOf('/') + 1;
     }
 
-    public PhotoMarker(double lat, double lng, File f) {
-        latitude = lat;
-        longitude = lng;
-        filePath = f.getAbsolutePath();
+    public PhotoItem(double latitude, double longitude, File file) {
+        this(latitude, longitude, file.getAbsolutePath());
     }
 
     public double getLatitude() {
@@ -41,13 +42,14 @@ public class PhotoMarker implements ClusterItem, Parcelable {
         return filePath;
     }
 
-    public File getFile() {
-        return new File(filePath);
+    public String getFilename() {
+        return filePath.substring(filenameIndex);
     }
 
-    protected PhotoMarker(Parcel in) {
+    protected PhotoItem(Parcel in) {
         latitude = in.readDouble();
         longitude = in.readDouble();
+        filenameIndex = in.readInt();
         filePath = in.readString();
     }
 
@@ -60,28 +62,29 @@ public class PhotoMarker implements ClusterItem, Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeDouble(latitude);
         dest.writeDouble(longitude);
+        dest.writeInt(filenameIndex);
         dest.writeString(filePath);
     }
 
     @SuppressWarnings("unused")
-    public static final Parcelable.Creator<PhotoMarker> CREATOR = new Parcelable.Creator<PhotoMarker>() {
+    public static final Parcelable.Creator<PhotoItem> CREATOR = new Parcelable.Creator<PhotoItem>() {
         @Override
-        public PhotoMarker createFromParcel(Parcel in) {
-            return new PhotoMarker(in);
+        public PhotoItem createFromParcel(Parcel in) {
+            return new PhotoItem(in);
         }
 
         @Override
-        public PhotoMarker[] newArray(int size) {
-            return new PhotoMarker[size];
+        public PhotoItem[] newArray(int size) {
+            return new PhotoItem[size];
         }
     };
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof PhotoMarker))
+        if (!(o instanceof PhotoItem))
             return false;
 
-        PhotoMarker other = (PhotoMarker) o;
+        PhotoItem other = (PhotoItem) o;
 
         return (latitude == other.latitude  &&  longitude == other.longitude  &&  filePath.equals(other.filePath));
     }

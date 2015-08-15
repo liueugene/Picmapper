@@ -11,24 +11,23 @@ import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
 
-import java.io.File;
 import java.util.ArrayList;
 
 /**
  * Created by Eugene on 6/30/2015.
  */
-public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> {
+public class PhotoGridAdapter extends RecyclerView.Adapter<PhotoGridAdapter.ViewHolder> {
 
     private static final String LOAD_PHOTO_TAG = "loadPhoto";
     private static final int[] GRADIENT_COLORS = {0xFFF5F5F5, 0xFFE0E0E0};
 
-    private ArrayList<PhotoMarker> markers;
+    private ArrayList<PhotoItem> markers;
     private Context context;
     private OnItemClickListener listener;
     private int photoSize;
     private GradientDrawable placeholder;
 
-    public PhotoAdapter(ArrayList<PhotoMarker> markers, Context context, OnItemClickListener listener) {
+    public PhotoGridAdapter(ArrayList<PhotoItem> markers, Context context, OnItemClickListener listener) {
         this.markers = markers;
         this.context = context;
         this.listener = listener;
@@ -42,11 +41,11 @@ public class PhotoAdapter extends RecyclerView.Adapter<PhotoAdapter.ViewHolder> 
     }
 
     public void onBindViewHolder(ViewHolder holder, int position) {
-        File photoFile = markers.get(position).getFile();
-        holder.filenameText.setText(photoFile.getName());
+        PhotoItem item = markers.get(position);
+        holder.filenameText.setText(item.getFilename());
 
         Picasso.with(context)
-                .load(photoFile)
+                .load("file:" + item.getFilePath())
                 .placeholder(placeholder)
                 .tag(LOAD_PHOTO_TAG)
                 .resize(photoSize, photoSize)

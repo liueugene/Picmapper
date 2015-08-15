@@ -45,7 +45,7 @@ class ReverseGeocodeTask extends AsyncTask<Double, Void, String> {
             locationStr += (zip == null) ? "" : zip;
 
         } catch (IOException e) {
-            Log.e(MapsActivity.TAG, "IO exception when reverse geocoding latLon " + latitude + ", " + longitude);
+            Log.e(MainActivity.TAG, "IO exception when reverse geocoding latLon " + latitude + ", " + longitude);
         }
 
         if (locationStr == null || locationStr.isEmpty())

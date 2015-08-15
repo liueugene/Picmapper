@@ -17,26 +17,26 @@ import java.util.Queue;
 /**
  * Created by Eugene on 7/13/2015.
  */
-class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoMarker>> {
+class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> {
 
-    private WeakReference<ClusterManager<PhotoMarker>> clusterManagerRef;
-    private ArrayList<PhotoMarker> markers;
+    private WeakReference<ClusterManager<PhotoItem>> clusterManagerRef;
+    private ArrayList<PhotoItem> markers;
     private Callback callback;
 
-    public LoadPhotosTask(ClusterManager<PhotoMarker> clusterManager, ArrayList<PhotoMarker> existingMarkers, Callback callback) {
-        clusterManagerRef = new WeakReference<ClusterManager<PhotoMarker>>(clusterManager);
+    public LoadPhotosTask(ClusterManager<PhotoItem> clusterManager, ArrayList<PhotoItem> existingMarkers, Callback callback) {
+        clusterManagerRef = new WeakReference<ClusterManager<PhotoItem>>(clusterManager);
         this.markers = existingMarkers;
         this.callback = callback;
     }
 
-    protected ArrayList<PhotoMarker> doInBackground(Void... params) {
+    protected ArrayList<PhotoItem> doInBackground(Void... params) {
 
         if (markers == null) {
-            markers = new ArrayList<PhotoMarker>();
+            markers = new ArrayList<PhotoItem>();
             Queue<File> dirs = new LinkedList<File>();
 
             dirs.add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM));
-            Log.d(MapsActivity.TAG, "photo directory: " + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath());
+            Log.d(MainActivity.TAG, "photo directory: " + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath());
             ExifInterface exifInterface;
 
             while (!dirs.isEmpty()) {
@@ -55,19 +55,19 @@ class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoMarker>> {
                         float[] latLon = new float[2];
 
                         if (exifInterface.getLatLong(latLon)) {
-                            PhotoMarker m = new PhotoMarker(latLon[0], latLon[1], files[i]);
+                            PhotoItem m = new PhotoItem(latLon[0], latLon[1], files[i]);
                             markers.add(m);
                         }
 
                     } catch (IOException e) {
-                        Log.e(MapsActivity.TAG, "IO exception when loading photo");
+                        Log.e(MainActivity.TAG, "IO exception when loading photo");
                     }
 
                 }
             }
         }
 
-        ClusterManager<PhotoMarker> clusterManager = clusterManagerRef.get();
+        ClusterManager<PhotoItem> clusterManager = clusterManagerRef.get();
 
         if (clusterManager != null)
             clusterManager.addItems(markers);
@@ -75,9 +75,9 @@ class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoMarker>> {
         return markers;
     }
 
-    protected void onPostExecute(ArrayList<PhotoMarker> markers) {
+    protected void onPostExecute(ArrayList<PhotoItem> markers) {
 
-        ClusterManager<PhotoMarker> clusterManager = clusterManagerRef.get();
+        ClusterManager<PhotoItem> clusterManager = clusterManagerRef.get();
 
         if (clusterManager != null) {
             clusterManager.cluster();
@@ -89,6 +89,6 @@ class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoMarker>> {
     }
 
     public interface Callback {
-        void onPhotosReady(ArrayList<PhotoMarker> markers);
+        void onPhotosReady(ArrayList<PhotoItem> markers);
     }
 }

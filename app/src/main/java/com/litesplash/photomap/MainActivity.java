@@ -6,31 +6,32 @@ import android.animation.ArgbEvaluator;
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.Snackbar;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.CommonStatusCodes;
@@ -40,60 +41,103 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapFragment;
-import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.maps.android.clustering.Cluster;
-import com.google.maps.android.clustering.ClusterManager;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collection;
 
-public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, ClusterManager.OnClusterItemClickListener<PhotoMarker>,
-        ClusterManager.OnClusterClickListener, GoogleMap.OnMapClickListener, GoogleMap.OnCameraChangeListener, PhotoListFragment.PhotoListFragmentListener,
+public class MainActivity extends AppCompatActivity implements BaseMapFragment.Listener, PhotoGridFragment.Listener,
+        PhotoInfoFragment.PhotoInfoFragmentListener, SlideUpPanelLayout.Listener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     protected static final String TAG = "PhotoMap";
+    private static final int RESET_EXIT_STATE = 0x2E5E7;
 
     private Toolbar toolbar;
     private AppBarLayout appBarLayout;
 
+    private MenuItem searchMenuItem;
+    private AutoCompleteTextView searchView;
+    private SlideUpPanelLayout mapLayout;
+
+    private RelativeLayout progressLayout;
+    private ProgressBar progressBar;
+
+    private BaseMapFragment mapFragment;
+    private PhotoInfoFragment photoInfoFragment;
+
     private GoogleMap gMap; // Might be null if Google Play services APK is not available.
     private GoogleApiClient googleApiClient;
-    private ClusterManager<PhotoMarker> clusterManager;
-    private CustomClusterRenderer<PhotoMarker> renderer;
+    /*
+    private ClusterManager<PhotoItem> clusterManager;
+    private CustomClusterRenderer<PhotoItem> renderer;
 
-    private ArrayList<PhotoMarker> allMarkers;
+    private ArrayList<PhotoItem> allMarkers;
+    */
 
     private PlacesSuggestionAdapter searchAdapter;
 
-    private PhotoMarker lastActiveMarker;
-    private Marker lastActiveNonClusteredMarker;
+    /*
+    private PhotoItem lastActiveClusterItem;
+    private Marker lastActiveUnclusteredMarker;
+    */
+
     private float lastZoom;
-    private boolean listFragmentShowing;
+    private boolean gridFragmentShowing;
     private boolean toolbarHidden;
 
-    private MenuItem searchMenuItem;
-    private AutoCompleteTextView searchView;
-    private RelativeLayout activityLayout;
-    private RelativeLayout progressLayout;
-    private ProgressBar progressBar;
+    private boolean initialConnection = true;
+    private boolean readyToExit = false;
+    private Toast exitToast;
+
+    private final MyHandler handler = new MyHandler(this);
+
+    private static class MyHandler extends Handler {
+        private WeakReference<MainActivity> activityRef;
+
+        public MyHandler(MainActivity activity) {
+            activityRef = new WeakReference<MainActivity>(activity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            MainActivity a = activityRef.get();
+            if (a != null) {
+                Log.d(TAG, "readyToExit set to false");
+                a.readyToExit = false;
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        activityLayout = (RelativeLayout) findViewById(R.id.maps_activity);
+        exitToast = Toast.makeText(this, "Press back again to exit.", Toast.LENGTH_SHORT);
+        mapLayout = (SlideUpPanelLayout) findViewById(R.id.map_layout);
+        mapLayout.setFragmentManager(getFragmentManager());
+
+        //initialize map
+        mapFragment = BaseMapFragment.newInstance();
+        mapLayout.setBackgroundFragment(mapFragment);
+
+        if (savedInstanceState == null) {
+            mapFragment.setRetainInstance(true);
+        }
+
+        mapLayout.setListener(this);
 
         //show progress indicator
-        getLayoutInflater().inflate(R.layout.progress_layout, activityLayout);
+        getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
         progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
         progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
 
@@ -108,13 +152,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         setSupportActionBar(toolbar);
-
+/*
         if (savedInstanceState != null) {
-            lastActiveMarker = savedInstanceState.getParcelable("lastActiveMarker");
+            lastActiveClusterItem = savedInstanceState.getParcelable("lastActiveClusterItem");
             allMarkers = savedInstanceState.getParcelableArrayList("allMarkers");
         }
+        */
 
-        ((MapFragment) getFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
+        googleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .build();
     }
 
     @Override
@@ -168,14 +219,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     protected void onStart() {
         super.onStart();
-
-        googleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .addApi(Places.GEO_DATA_API)
-                .addApi(Places.PLACE_DETECTION_API)
-                .build();
         googleApiClient.connect();
     }
 
@@ -188,11 +231,18 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        handler.removeMessages(RESET_EXIT_STATE);
+        exitToast.cancel();
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
-
-        outState.putParcelable("lastActiveMarker", lastActiveMarker);
+/*
+        outState.putParcelable("lastActiveClusterItem", lastActiveClusterItem);
         outState.putParcelableArrayList("allMarkers", allMarkers);
-
+*/
         super.onSaveInstanceState(outState);
     }
 
@@ -208,15 +258,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     public void onMapReady(GoogleMap googleMap) {
         gMap = googleMap;
-        setUpMap();
-        getWindow().setBackgroundDrawable(null); //remove background overdraw
-    }
-
-    private void setUpMap() {
-        clusterManager = new ClusterManager<PhotoMarker>(this, gMap);
-        renderer = new CustomClusterRenderer<PhotoMarker>(this, gMap, clusterManager, lastActiveMarker, new CustomClusterRenderer.OnLastActiveMarkerRenderedListener<PhotoMarker>() {
+        /*
+        clusterManager = new ClusterManager<PhotoItem>(this, gMap);
+        renderer = new CustomClusterRenderer<PhotoItem>(this, gMap, clusterManager, lastActiveClusterItem, new CustomClusterRenderer.OnLastActiveMarkerRenderedListener<PhotoItem>() {
             @Override
-            public void onLastActiveMarkerRendered(PhotoMarker clusterItem, Marker marker) {
+            public void onLastActiveMarkerRendered(PhotoItem clusterItem, Marker marker) {
                 setActiveMarker(marker);
             }
         });
@@ -227,24 +273,23 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         gMap.setOnMapClickListener(this);
         gMap.setInfoWindowAdapter(clusterManager.getMarkerManager());
 
-        TypedValue actionBarSizeTv = new TypedValue();
-        if (getTheme().resolveAttribute(R.attr.actionBarSize, actionBarSizeTv, true))
-            gMap.setPadding(0, TypedValue.complexToDimensionPixelSize(actionBarSizeTv.data, getResources().getDisplayMetrics()), 0, 0);
+        TypedValue actionBarSize = new TypedValue();
+        if (getTheme().resolveAttribute(R.attr.actionBarSize, actionBarSize, true))
+            gMap.setPadding(0, TypedValue.complexToDimensionPixelSize(actionBarSize.data, getResources().getDisplayMetrics()), 0, 0);
 
         clusterManager.setRenderer(renderer);
         clusterManager.setOnClusterItemClickListener(this);
         clusterManager.setOnClusterClickListener(this);
-//        clusterManager.getMarkerCollection().setOnInfoWindowAdapter(new PhotoInfoWindowAdapter());
 
         new LoadPhotosTask(clusterManager, allMarkers, new LoadPhotosTask.Callback() {
             @Override
-            public void onPhotosReady(ArrayList<PhotoMarker> markers) {
+            public void onPhotosReady(ArrayList<PhotoItem> markers) {
                 ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(progressLayout, "alpha", progressLayout.getAlpha(), 0f);
                 fadeAnim.setDuration(500);
                 fadeAnim.addListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        activityLayout.removeView(progressLayout);
+                        mapLayout.removeView(progressLayout);
                     }
                 });
                 fadeAnim.start();
@@ -253,6 +298,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     allMarkers = markers;
             }
         }).execute();
+        */
+        getWindow().setBackgroundDrawable(null); //remove background overdraw
     }
 
     private void zoomToCurrentLocation() {
@@ -268,34 +315,27 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         gMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(latitude, longitude), 11));
     }
 
-    private void addInfoFragment(PhotoMarker photoMarker) {
+    private void addInfoFragment(PhotoItem photoItem) {
+        /*
         removeInfoFragment();
-        PhotoInfoFragment infoFragment = PhotoInfoFragment.newInstance(photoMarker);
 
-        getFragmentManager().beginTransaction()
-                .setCustomAnimations(R.animator.slide_up, 0, 0, R.animator.slide_down)
-                .add(R.id.maps_activity, infoFragment, "photoInfoFragment")
-                .addToBackStack(null)
-                .commit();
+        FragmentManager fm = getFragmentManager();
+        PhotoInfoFragment photoInfo = (PhotoInfoFragment) fm.findFragmentById(R.id.photo_info_fragment);
+
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(PhotoInfoFragment.PHOTO_ITEM_TAG, photoItem);
+
+        photoInfo.updateInfo(bundle);
+
+        fm.beginTransaction().show(photoInfo).addToBackStack(null).commit();
+        */
+
+        photoInfoFragment = PhotoInfoFragment.newInstance(photoItem);
+        mapLayout.setPanelFragment(photoInfoFragment);
     }
 
     private void removeInfoFragment() {
-        FragmentManager fm = getFragmentManager();
-        PhotoInfoFragment infoFrag = (PhotoInfoFragment) fm.findFragmentByTag("photoInfoFragment");
-
-        if (infoFrag != null) {/*
-            fm.beginTransaction()
-                    .setCustomAnimations(0, R.animator.slide_down)
-                    .remove(infoFrag)
-                    .commit();
-                    */
-            fm.popBackStackImmediate();
-
-            if (lastActiveNonClusteredMarker != null) {
-                lastActiveNonClusteredMarker.remove();
-                lastActiveNonClusteredMarker = null;
-            }
-        }
+        getFragmentManager().popBackStackImmediate();
     }
 
     private void setActionBarAlpha(boolean turnOpaque) {
@@ -363,34 +403,40 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .start();
         toolbarHidden = true;
     }
-
-    public boolean onClusterItemClick(PhotoMarker photoMarker) {
+/*
+    public boolean onClusterItemClick(PhotoItem photoItem) {
         showToolbar();
 
-        addInfoFragment(photoMarker);
-        Marker m = setActiveMarker(photoMarker);
+        Marker marker = renderer.getMarker(photoItem);
 
-        if (!photoMarker.equals(lastActiveMarker)) {
-            Marker lastMarker = renderer.getMarker(lastActiveMarker);
-            if (lastMarker != null)
-                lastMarker.setIcon(BitmapDescriptorFactory.defaultMarker());
+        if (!photoItem.equals(lastActiveClusterItem)) {
+            setLastMarkerInactive();
         }
 
-        //pan camera to marker position
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLng(m.getPosition());
-        gMap.animateCamera(cameraUpdate, 500, null);
+        lastActiveClusterItem = photoItem;
+        addInfoFragment(photoItem);
+        setActiveMarker(marker);
 
-        lastActiveMarker = photoMarker;
         return true;
     }
 
-    private Marker setActiveMarker(PhotoMarker photoMarker) {
-        Marker m = renderer.getMarker(photoMarker);
-
-        if (m != null) {
-            setActiveMarker(m);
+    private boolean setLastMarkerInactive() {
+        if (lastActiveUnclusteredMarker != null) {
+            lastActiveUnclusteredMarker.remove();
+            lastActiveUnclusteredMarker = null;
+            return true;
         }
-        return m;
+
+        if (lastActiveClusterItem != null) {
+            Marker marker = renderer.getMarker(lastActiveClusterItem);
+            if (marker != null) {
+                marker.setIcon(BitmapDescriptorFactory.defaultMarker());
+                lastActiveClusterItem = null;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void setActiveMarker(Marker marker) {
@@ -398,30 +444,29 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         marker.showInfoWindow();
     }
 
+
     public boolean onClusterClick(Cluster cluster) {
-        ArrayList<PhotoMarker> markerArrayList = new ArrayList<PhotoMarker>(cluster.getItems());
-        Bundle bundle = new Bundle();
-        bundle.putParcelableArrayList("markerArrayList", markerArrayList);
+        setLastMarkerInactive();
+        ArrayList<PhotoItem> markerArrayList = new ArrayList<PhotoItem>(cluster.getItems());
+        PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList);
 
-        PhotoListFragment photoListFragment = new PhotoListFragment();
-        photoListFragment.setArguments(bundle);
-
-        listFragmentShowing = true;
+        gridFragmentShowing = true;
         showToolbar();
-        setActionBarAlpha(listFragmentShowing);
+        setActionBarAlpha(gridFragmentShowing);
         removeInfoFragment();
 
         FragmentManager fm = getFragmentManager();
         FragmentTransaction transaction = fm.beginTransaction();
 
         transaction.setCustomAnimations(R.animator.slide_up, 0, 0, R.animator.slide_down)
-                .add(R.id.maps_activity, photoListFragment, "photoListFragment")
+                .add(R.id.maps_activity_layout, photoGridFragment, "photoGridFragment")
                 .addToBackStack(null)
                 .commit();
 
         renderer.getMarker(cluster).showInfoWindow();
         return true;
     }
+*/
 
     public void onMapClick(LatLng latLng) {
 
@@ -430,13 +475,48 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         else
             hideToolbar();
 
-        Marker lastMarker = renderer.getMarker(lastActiveMarker);
-        if (lastMarker != null) {
-            lastMarker.setIcon(BitmapDescriptorFactory.defaultMarker());
-            lastActiveMarker = null;
-        }
+        if (mapFragment.setLastMarkerInactive())
+            removeInfoFragment();
+    }
 
+    @Override
+    public void onPhotosReady(ArrayList<PhotoItem> markers) {
+        ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(progressLayout, "alpha", progressLayout.getAlpha(), 0f);
+        fadeAnim.setDuration(500);
+        fadeAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mapLayout.removeView(progressLayout);
+            }
+        });
+        fadeAnim.start();
+
+        mapFragment.cacheItems(markers);
+    }
+
+    @Override
+    public void onPhotoItemClick(PhotoItem item) {
+        showToolbar();
+        addInfoFragment(item);
+    }
+
+    @Override
+    public void onClusterClick(Collection<PhotoItem> items) {
+        ArrayList<PhotoItem> markerArrayList = new ArrayList<PhotoItem>(items);
+        PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList);
+
+        gridFragmentShowing = true;
+        showToolbar();
+        setActionBarAlpha(gridFragmentShowing);
         removeInfoFragment();
+
+        FragmentManager fm = getFragmentManager();
+        FragmentTransaction transaction = fm.beginTransaction();
+
+        transaction.setCustomAnimations(R.animator.slide_up, 0, 0, R.animator.slide_down)
+                .add(R.id.map_layout, photoGridFragment, "photoGridFragment")
+                .addToBackStack(null)
+                .commit();
     }
 
     public void onCameraChange(CameraPosition cameraPosition) {
@@ -445,56 +525,37 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         searchAdapter.setBounds(bounds);
 
         if (cameraPosition.zoom < lastZoom) {
-            Marker m = renderer.getMarker(lastActiveMarker);
-
-            if (m != null) {
-                m.hideInfoWindow();
-                m.setIcon(BitmapDescriptorFactory.defaultMarker());
+            if (mapFragment.setLastMarkerInactive())
                 removeInfoFragment();
-            } else if (lastActiveNonClusteredMarker != null) {
-                removeInfoFragment();
-            }
-
             hideToolbar();
         }
 
         lastZoom = cameraPosition.zoom;
-        clusterManager.onCameraChange(cameraPosition);
     }
 
     @Override
-    public void onPhotoListItemClick(PhotoMarker photoMarker) {
-        FragmentManager fm = getFragmentManager();
-        Fragment listFragment = fm.findFragmentByTag("photoListFragment");
-
-        if (listFragment != null) {
-            /*
-            fm.beginTransaction().setCustomAnimations(0, R.animator.slide_down)
-                    .remove(listFragment)
-                    .commit();
-                    */
-            fm.popBackStackImmediate();
-        }
-
+    public void onPhotoGridItemClick(PhotoItem photoItem) {
+        /*
         Marker marker = gMap.addMarker(new MarkerOptions()
-                .position(photoMarker.getPosition())
+                .position(photoItem.getPosition())
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
 
-        listFragmentShowing = false;
-        setActionBarAlpha(listFragmentShowing);
-        addInfoFragment(photoMarker);
+        lastActiveUnclusteredMarker = marker;
+        */
+        mapFragment.setUnclusteredMarker(new MarkerOptions()
+                .position(photoItem.getPosition())
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
 
-        //pan camera to marker position
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLng(photoMarker.getPosition());
-        gMap.animateCamera(cameraUpdate, 500, null);
+        getFragmentManager().popBackStackImmediate(); //hide grid fragment
 
-        lastActiveNonClusteredMarker = marker;
+        gridFragmentShowing = false;
+        setActionBarAlpha(gridFragmentShowing);
+        addInfoFragment(photoItem);
     }
 
     @Override
-    public void onPhotoListFragmentShown() {
+    public void onPhotoGridFragmentShown() {
         FragmentManager fm = getFragmentManager();
-        MapFragment mapFragment = (MapFragment) fm.findFragmentById(R.id.map);
 
         if (mapFragment != null) {
             fm.beginTransaction().hide(mapFragment).commit();
@@ -502,9 +563,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onPhotoListFragmentHidden() {
+    public void onPhotoGridFragmentHidden() {
         FragmentManager fm = getFragmentManager();
-        MapFragment mapFragment = (MapFragment) fm.findFragmentById(R.id.map);
 
         if (mapFragment != null) {
             fm.beginTransaction().show(mapFragment).commit();
@@ -512,29 +572,69 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
+    public void onFinalHeightMeasured(int fragmentHeight) {
+        Marker marker = mapFragment.getActiveMarker();
+/*
+        if (lastActiveUnclusteredMarker == null) {
+            marker = renderer.getMarker(lastActiveClusterItem);
+        } else {
+            marker = lastActiveUnclusteredMarker;
+        }
+*/
+        if (marker == null)
+            return;
+
+        Projection projection = gMap.getProjection();
+
+        Log.d(TAG, "fragment height: " + fragmentHeight);
+        Log.d(TAG, "activity bottom: " + mapLayout.getBottom());
+
+        int fragmentDeltaYFromCenter = mapLayout.getBottom()/2 - fragmentHeight;
+
+        Point markerPoint = projection.toScreenLocation(marker.getPosition());
+
+        Log.d(TAG, "marker screen location: " + markerPoint.x + ", " + markerPoint.y);
+
+        //pan camera to position marker above fragment if needed
+        if (fragmentDeltaYFromCenter < 0) {
+            LatLng latLng = projection.fromScreenLocation(new Point(markerPoint.x, markerPoint.y - fragmentDeltaYFromCenter));
+            gMap.animateCamera(CameraUpdateFactory.newLatLng(latLng), 500, null);
+        } else {
+            gMap.animateCamera(CameraUpdateFactory.newLatLng(marker.getPosition()), 500, null);
+        }
+    }
+
+    @Override
     public void onBackPressed() {
 
-        if (lastActiveNonClusteredMarker != null) {
-            lastActiveNonClusteredMarker.remove();
-            lastActiveNonClusteredMarker = null;
+
+        mapFragment.setLastMarkerInactive();
+        /*
+        Marker marker = renderer.getMarker(lastActiveClusterItem);
+
+        if (marker != null) {
+            marker.hideInfoWindow();
+            marker.setIcon(BitmapDescriptorFactory.defaultMarker());
         }
+        */
 
-        Marker m = renderer.getMarker(lastActiveMarker);
-
-        if (m != null) {
-            m.hideInfoWindow();
-            m.setIcon(BitmapDescriptorFactory.defaultMarker());
-        }
-
-        listFragmentShowing = false;
+        gridFragmentShowing = false;
         hideToolbar();
-        setActionBarAlpha(listFragmentShowing);
+        setActionBarAlpha(gridFragmentShowing);
 
         if (MenuItemCompat.isActionViewExpanded(searchMenuItem)) {
             MenuItemCompat.collapseActionView(searchMenuItem);
-            // Force checking the native fragment manager for a backstack rather than the support lib fragment manager.
+
+        // Force checking the native fragment manager for a backstack rather than the support lib fragment manager.
         } else if (!getFragmentManager().popBackStackImmediate()) {
-            super.onBackPressed();
+
+            if (readyToExit) {
+                super.onBackPressed();
+            } else {
+                exitToast.show();
+                readyToExit = true;
+                handler.sendMessageDelayed(handler.obtainMessage(RESET_EXIT_STATE), 3000);
+            }
         }
     }
 
@@ -550,7 +650,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     //Google Places API
     @Override
     public void onConnected(Bundle connectionHint) {
-        zoomToCurrentLocation();
+        if (initialConnection) {
+            zoomToCurrentLocation();
+            initialConnection = false;
+        }
     }
 
     @Override
@@ -565,6 +668,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "location api connection failed");
         //TODO fill in
     }
+
+    @Override
+    public void onPanelClosed(View panelView) {
+        mapFragment.setLastMarkerInactive();
+        photoInfoFragment.shouldAnimateExit(false);
+        mapLayout.removePanelFragment();
+    }
+
 
     private class SuggestionClickListener implements AdapterView.OnItemClickListener, ResultCallback<PlaceBuffer>, View.OnClickListener {
 
@@ -595,7 +706,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
 
                 places.getStatus().getStatusCode();
-                Snackbar snackbar = Snackbar.make(activityLayout, str, Snackbar.LENGTH_LONG);
+                Snackbar snackbar = Snackbar.make(mapLayout, str, Snackbar.LENGTH_LONG);
                 snackbar.setAction("Retry", this);
                 snackbar.show();
             }
@@ -604,12 +715,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             searchView.setText("");
             MenuItemCompat.collapseActionView(searchMenuItem);
-
-            View view = getCurrentFocus();
-            if (view != null) {
-                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-            }
+            Util.hideKeyboard(MainActivity.this);
         }
 
         //retry button

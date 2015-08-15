@@ -166,7 +166,7 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
 
         ///*
         if (!googleApiClient.isConnected()) {
-            Log.d(MapsActivity.TAG, "Google API client not connected");
+            Log.d(MainActivity.TAG, "Google API client not connected");
             return null;
         }
 
@@ -176,7 +176,7 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
         //load failure
         if (!buffer.getStatus().isSuccess()) {
             Toast.makeText(getContext(), "Could not load suggestions from server.", Toast.LENGTH_SHORT).show();
-            Log.e(MapsActivity.TAG, "places API autocomplete load error: " + buffer.getStatus().getStatusMessage());
+            Log.e(MainActivity.TAG, "places API autocomplete load error: " + buffer.getStatus().getStatusMessage());
             buffer.release();
             return null;
         }

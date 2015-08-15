@@ -8,6 +8,7 @@ import android.app.Fragment;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,37 +18,30 @@ import com.squareup.picasso.Picasso;
 import java.util.ArrayList;
 
 
-public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemClickListener {
+public class PhotoGridFragment extends Fragment implements PhotoGridAdapter.OnItemClickListener {
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "markerArrayList";
+    private static final String MARKER_ARRAY_LIST = "markerArrayList";
     private static final String LOAD_PHOTO_TAG = "loadPhoto";
 
     private Context context;
-    private PhotoListFragmentListener listener;
-    private ArrayList<PhotoMarker> markerArrayList;
+    private Listener listener;
+    private ArrayList<PhotoItem> markerArrayList;
 
     private RecyclerView recyclerView;
     private RecyclerView.Adapter adapter;
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment PhotoListFragment.
-     */
-    // TODO: Rename and change types and number of parameters
-    public static PhotoListFragment newInstance(String param1, String param2) {
-        PhotoListFragment fragment = new PhotoListFragment();
+    private boolean exiting = false;
+
+    public static PhotoGridFragment newInstance(ArrayList<PhotoItem> markerArrayList) {
+        PhotoGridFragment fragment = new PhotoGridFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
+        args.putParcelableArrayList(MARKER_ARRAY_LIST, markerArrayList);
         fragment.setArguments(args);
         return fragment;
     }
 
-    public PhotoListFragment() {
+    public PhotoGridFragment() {
         // Required empty public constructor
     }
 
@@ -55,7 +49,7 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            markerArrayList = getArguments().getParcelableArrayList(ARG_PARAM1);
+            markerArrayList = getArguments().getParcelableArrayList(MARKER_ARRAY_LIST);
         }
         context = getActivity();
     }
@@ -67,7 +61,7 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
         View v = inflater.inflate(R.layout.cluster_list_fragment, container, false);
         recyclerView = (AutoFitRecyclerView) v.findViewById(R.id.photo_recycler_view);
 
-        adapter = new PhotoAdapter(markerArrayList, context, this);
+        adapter = new PhotoGridAdapter(markerArrayList, context, this);
 
         recyclerView.setAdapter(adapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -97,7 +91,10 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
             anim.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    listener.onPhotoListFragmentShown();
+                    if (!exiting) {
+                        Log.d(MainActivity.TAG, "onAnimationEnd called for slide up");
+                        listener.onPhotoGridFragmentShown();
+                    }
                 }
             });
         } else {
@@ -105,7 +102,9 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
             anim.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationStart(Animator animation) {
-                    listener.onPhotoListFragmentHidden();
+                    Log.d(MainActivity.TAG, "onAnimationStart called for slide down");
+                    listener.onPhotoGridFragmentHidden();
+                    exiting = true;
                 }
             });
         }
@@ -116,28 +115,52 @@ public class PhotoListFragment extends Fragment implements PhotoAdapter.OnItemCl
     public void onAttach(Activity activity) {
         super.onAttach(activity);
         try {
-            listener = (PhotoListFragmentListener) activity;
+            listener = (Listener) activity;
         } catch (ClassCastException e) {
-            throw new ClassCastException(activity.toString()
-                    + " must implement PhotoListFragmentListener");
+            throw new ClassCastException(activity.toString() + " must implement PhotoGridFragment.Listener");
         }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        Log.d(MainActivity.TAG, "fragment onPause called");
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        Log.d(MainActivity.TAG, "fragment onStop called");
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        Log.d(MainActivity.TAG, "fragment onDestroyView called");
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.d(MainActivity.TAG, "fragment onDestroy called");
     }
 
     @Override
     public void onDetach() {
         super.onDetach();
         listener = null;
+        Log.d(MainActivity.TAG, "fragment onDetach called");
     }
 
     @Override
     public void onPhotoItemClick(View view, int position) {
-        PhotoMarker pm = markerArrayList.get(position);
-        listener.onPhotoListItemClick(pm);
+        PhotoItem pm = markerArrayList.get(position);
+        listener.onPhotoGridItemClick(pm);
     }
 
-    public interface PhotoListFragmentListener {
-        void onPhotoListItemClick(PhotoMarker photoMarker);
-        void onPhotoListFragmentShown();
-        void onPhotoListFragmentHidden();
+    public interface Listener {
+        void onPhotoGridItemClick(PhotoItem photoItem);
+        void onPhotoGridFragmentShown();
+        void onPhotoGridFragmentHidden();
     }
 }

@@ -43,7 +43,6 @@ class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> {
                 File[] files = dirs.remove().listFiles();
 
                 for (int i = 0; i < files.length; i++) {
-
                     if (files[i].isDirectory()) {
                         dirs.add(files[i]);
                         continue;

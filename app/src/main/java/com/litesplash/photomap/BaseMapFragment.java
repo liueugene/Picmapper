@@ -40,6 +40,8 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback,
 
     private Listener listener;
 
+    private boolean firstLaunch = true;
+
     public static BaseMapFragment newInstance() {
         return new BaseMapFragment();
     }
@@ -47,6 +49,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback,
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setRetainInstance(true);
 
         if (savedInstanceState != null) {
             Bundle saveObjects = savedInstanceState.getBundle(SAVE_OBJECTS);
@@ -59,7 +62,11 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback,
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        getMapAsync(this);
+
+        if (firstLaunch)
+            getMapAsync(this);
+        else
+            listener.onMapReady(gMap);
     }
 
     @Override
@@ -93,18 +100,14 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback,
     public void onDetach() {
         super.onDetach();
         listener = null;
+        firstLaunch = false;
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         gMap = googleMap;
-        clusterManager = new ClusterManager<PhotoItem>(getActivity(), gMap);
-        renderer = new CustomClusterRenderer<PhotoItem>(getActivity(), gMap, clusterManager, lastActiveClusterItem, new CustomClusterRenderer.OnLastActiveMarkerRenderedListener<PhotoItem>() {
-            @Override
-            public void onLastActiveMarkerRendered(PhotoItem clusterItem, Marker marker) {
-                setActiveMarker(marker);
-            }
-        });
+        clusterManager = new ClusterManager<PhotoItem>(getActivity().getApplicationContext(), gMap);
+        renderer = new CustomClusterRenderer<PhotoItem>(getActivity().getApplicationContext(), gMap, clusterManager);
 
         gMap.setMyLocationEnabled(true);
         gMap.setOnCameraChangeListener(this);
@@ -219,7 +222,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback,
         private View view;
 
         public DummyInfoWindowAdapter() {
-            view = new View(getActivity());
+            view = new View(getActivity().getApplicationContext());
         }
         @Override
         public View getInfoWindow(Marker marker) {

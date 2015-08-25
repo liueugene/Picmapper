@@ -60,6 +60,9 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     protected static final String TAG = "PhotoMap";
+
+    private static final String MAP_FRAGMENT_TAG = "mapFragment";
+    private static final String ACTIVE_ITEM_KEY = "activeItem";
     private static final int RESET_EXIT_STATE = 0x2E5E7;
 
     private Toolbar toolbar;
@@ -87,15 +90,16 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     private PlacesSuggestionAdapter searchAdapter;
 
     /*
-    private PhotoItem lastActiveClusterItem;
     private Marker lastActiveUnclusteredMarker;
     */
+
+    private PhotoItem activeItem;
 
     private float lastZoom;
     private boolean gridFragmentShowing;
     private boolean toolbarHidden;
 
-    private boolean initialConnection = true;
+    private boolean firstLaunch;
     private boolean readyToExit = false;
     private Toast exitToast;
 
@@ -122,24 +126,35 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+        FragmentManager fm = getFragmentManager();
+
         exitToast = Toast.makeText(this, "Press back again to exit.", Toast.LENGTH_SHORT);
         mapLayout = (SlideUpPanelLayout) findViewById(R.id.map_layout);
-        mapLayout.setFragmentManager(getFragmentManager());
+        mapLayout.setFragmentManager(fm);
 
         //initialize map
-        mapFragment = BaseMapFragment.newInstance();
-        mapLayout.setBackgroundFragment(mapFragment);
+        mapFragment = (BaseMapFragment) fm.findFragmentByTag(MAP_FRAGMENT_TAG);
 
-        if (savedInstanceState == null) {
-            mapFragment.setRetainInstance(true);
+        if (mapFragment == null) {
+            mapFragment = BaseMapFragment.newInstance();
+            fm.beginTransaction().add(mapFragment, MAP_FRAGMENT_TAG).commit();
         }
 
+        mapLayout.setBackgroundFragment(mapFragment);
         mapLayout.setListener(this);
 
-        //show progress indicator
-        getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
-        progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
-        progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
+        //show progress indicator for initial load
+        if (savedInstanceState == null) {
+            getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
+            progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
+            progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
+            firstLaunch = true;
+        } else { //reload from last saved state
+            PhotoItem lastItem = savedInstanceState.getParcelable(ACTIVE_ITEM_KEY);
+            if (lastItem != null) {
+                addInfoFragment(lastItem);
+            }
+        }
 
         //set new toolbar layout as action bar
         toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -244,6 +259,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         outState.putParcelableArrayList("allMarkers", allMarkers);
 */
         super.onSaveInstanceState(outState);
+        outState.putParcelable(ACTIVE_ITEM_KEY, activeItem);
     }
 
     @Override
@@ -332,10 +348,12 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         photoInfoFragment = PhotoInfoFragment.newInstance(photoItem);
         mapLayout.setPanelFragment(photoInfoFragment);
+        activeItem = photoItem;
     }
 
     private void removeInfoFragment() {
         getFragmentManager().popBackStackImmediate();
+        activeItem = null;
     }
 
     private void setActionBarAlpha(boolean turnOpaque) {
@@ -606,8 +624,6 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
     @Override
     public void onBackPressed() {
-
-
         mapFragment.setLastMarkerInactive();
         /*
         Marker marker = renderer.getMarker(lastActiveClusterItem);
@@ -627,7 +643,6 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         // Force checking the native fragment manager for a backstack rather than the support lib fragment manager.
         } else if (!getFragmentManager().popBackStackImmediate()) {
-
             if (readyToExit) {
                 super.onBackPressed();
             } else {
@@ -650,9 +665,9 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     //Google Places API
     @Override
     public void onConnected(Bundle connectionHint) {
-        if (initialConnection) {
+        if (firstLaunch) {
             zoomToCurrentLocation();
-            initialConnection = false;
+            firstLaunch = false;
         }
     }
 
@@ -698,7 +713,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
                 switch (places.getStatus().getStatusCode()) {
                     case CommonStatusCodes.NETWORK_ERROR:
                     case CommonStatusCodes.TIMEOUT:
-                        str = "Couldn't connect to the location provider";
+                        str = "Couldn't connect to the server";
                         break;
 
                     default:

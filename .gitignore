@@ -2,8 +2,9 @@
 *.ap_
 *.dex
 *.class
-google_maps_api.xml
+private_keys.xml
 
+.idea
 .gradle
 /local.properties
 /.idea/workspace.xml

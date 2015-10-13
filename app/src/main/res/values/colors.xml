@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="translucent_white">#80ffffff</color>
+    <color name="translucent_gray">#80eeeeee</color>
+    <color name="white_opacity_90">#e6ffffff</color>
+</resources>

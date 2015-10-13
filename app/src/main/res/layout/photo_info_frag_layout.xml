@@ -1,14 +1,15 @@
-<com.litesplash.photomap.CustomRelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.litesplash.picmapper.CustomRelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="bottom"
-    android:paddingTop="35dp"
-    android:paddingLeft="10dp"
-    android:paddingRight="10dp"
-    android:paddingBottom="10dp"
+    android:paddingTop="16dp"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingBottom="8dp"
+    android:clickable="true"
     android:background="@drawable/photo_info_bg" >
 
-        <com.litesplash.photomap.AnimImageView
+        <com.litesplash.picmapper.AnimImageView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:id="@+id/info_imageview"
@@ -29,8 +30,10 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textAppearance="@style/gray_text"
-            android:text=""
+            android:textAppearance="@style/condensed_gray_text"
+            android:singleLine="true"
+            android:ellipsize="none"
+            android:scrollHorizontally="true"
             android:id="@+id/location_text"
             android:layout_below="@+id/filename" />
 
@@ -71,4 +74,4 @@
             android:layout_alignParentEnd="true"
             android:layout_alignParentRight="true" />
 
-</com.litesplash.photomap.CustomRelativeLayout>
+</com.litesplash.picmapper.CustomRelativeLayout>

@@ -1,3 +1,9 @@
+*.apk
+*.ap_
+*.dex
+*.class
+google_maps_api.xml
+
 .gradle
 /local.properties
 /.idea/workspace.xml

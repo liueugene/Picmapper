@@ -17,4 +17,8 @@
     <style name="gray_text" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">#616161</item>
     </style>
+
+    <style name="condensed_gray_text" parent="gray_text">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+    </style>
 </resources>

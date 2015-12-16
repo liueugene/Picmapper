@@ -1,5 +1,6 @@
 package com.litesplash.picmapper;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ArgbEvaluator;
@@ -11,6 +12,7 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
@@ -21,6 +23,7 @@ import android.os.Message;
 import android.support.annotation.StringRes;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -74,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     private static final String MAP_FRAGMENT_TAG = "mapFragment";
     private static final String ACTIVE_ITEM_KEY = "activeItem";
     private static final int RESET_EXIT_STATE = 0x2E5E7;
+    private static final int COARSE_LOCATION = 0;
 
     private Toolbar toolbar;
     private AppBarLayout appBarLayout;
@@ -616,8 +620,16 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     //Google Places API
     @Override
     public void onConnected(Bundle connectionHint) {
-        Location lastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
 
+        //request location permission for Android 6.0+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, COARSE_LOCATION);
+        } else {
+           setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
+        }
+    }
+
+    private void setUpLocation(Location lastLocation) {
         if (firstLaunch) {
             //zoom to current location
             if (lastLocation != null) {
@@ -629,12 +641,15 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         }
 
         if (adView != null) {
-            AdRequest adRequest = new AdRequest.Builder()
+            AdRequest.Builder arBuilder = new AdRequest.Builder()
                     .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
                     .addTestDevice("BC1C504B6ABB299ED8D45E0663F4EA5C")
-                    .addTestDevice("3B0B162556C7396C96335F2EBCCE5189")
-                    .setLocation(lastLocation)
-                    .build();
+                    .addTestDevice("3B0B162556C7396C96335F2EBCCE5189");
+
+            if (lastLocation != null)
+                arBuilder.setLocation(lastLocation);
+
+            AdRequest adRequest = arBuilder.build();
             adView.loadAd(adRequest);
         }
     }
@@ -648,15 +663,6 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
         Log.d(LOG_TAG, "location api connection failed");
-
-        if (adView != null) {
-            AdRequest adRequest = new AdRequest.Builder()
-                    .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
-                    .addTestDevice("BC1C504B6ABB299ED8D45E0663F4EA5C")
-                    .addTestDevice("3B0B162556C7396C96335F2EBCCE5189")
-                    .build();
-            adView.loadAd(adRequest);
-        }
     }
 
     @Override
@@ -664,6 +670,18 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         mapFragment.setLastMarkerInactive();
         photoInfoFragment.shouldAnimateExit(false);
         mapLayout.removePanelFragment();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == COARSE_LOCATION) {
+
+            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
+            } else {
+                setUpLocation(null);
+            }
+        }
     }
 
     private class SuggestionClickListener implements AdapterView.OnItemClickListener, ResultCallback<PlaceBuffer>, View.OnClickListener {

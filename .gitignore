@@ -3,9 +3,9 @@
 *.dex
 *.class
 private_keys.xml
-
+*.iml
 .idea
-.gradle
+.gradle/
 /local.properties
 .DS_Store
 /build

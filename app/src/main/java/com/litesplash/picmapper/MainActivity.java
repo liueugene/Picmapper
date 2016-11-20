@@ -7,24 +7,31 @@ import android.animation.ArgbEvaluator;
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.content.ClipData;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.support.annotation.StringRes;
 import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.MenuItemCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -36,9 +43,10 @@ import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -77,11 +85,18 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     private static final String MAP_FRAGMENT_TAG = "mapFragment";
     private static final String ACTIVE_ITEM_KEY = "activeItem";
     private static final int RESET_EXIT_STATE = 0x2E5E7;
-    private static final int COARSE_LOCATION = 0;
+    private static final int FINE_LOCATION_REQUEST = 0;
+    private static final int OPEN_DIR_REQUEST = 1;
+    private static final int READ_STORAGE_REQUEST = 2;
+    private static final int MULTI_REQUEST = 3;
 
     private Toolbar toolbar;
     private AppBarLayout appBarLayout;
+    private DrawerLayout drawerLayout;
+    private NavigationView navDrawer;
+    private ActionBarDrawerToggle drawerToggle;
 
+    private RelativeLayout searchLayout;
     private MenuItem searchMenuItem;
     private AutoCompleteTextView searchView;
     private SlideUpPanelLayout mapLayout;
@@ -152,19 +167,6 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         }
 
         exitToast = Toast.makeText(this, "Press back again to exit.", Toast.LENGTH_SHORT);
-        mapLayout = (SlideUpPanelLayout) findViewById(R.id.map_layout);
-        mapLayout.setFragmentManager(fm);
-
-        //initialize map
-        mapFragment = (BaseMapFragment) fm.findFragmentByTag(MAP_FRAGMENT_TAG);
-
-        if (mapFragment == null) {
-            mapFragment = BaseMapFragment.newInstance();
-            fm.beginTransaction().add(mapFragment, MAP_FRAGMENT_TAG).commit();
-        }
-
-        mapLayout.setBackgroundFragment(mapFragment);
-        mapLayout.setListener(this);
 
         //set new toolbar layout as action bar
         toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -179,6 +181,58 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         }
 
         setSupportActionBar(toolbar);
+
+        drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        navDrawer = (NavigationView) findViewById(R.id.nav_drawer);
+        navDrawer.inflateHeaderView(R.layout.nav_drawer_header);
+        navDrawer.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(MenuItem item) {
+/*
+                if (item.getItemId() == R.id.open_storage) {
+                    openAdditionalPhotos();
+                    return true;
+                }
+*/
+
+                int type;
+                switch (item.getItemId()) {
+                    case R.id.satellite_view:
+                        type = GoogleMap.MAP_TYPE_HYBRID;
+                        break;
+                    case R.id.terrain_view:
+                        type = GoogleMap.MAP_TYPE_TERRAIN;
+                        break;
+                    default:
+                        type = GoogleMap.MAP_TYPE_NORMAL;
+                }
+
+                if (mapFragment != null)
+                    mapFragment.setMapType(type);
+                drawerLayout.closeDrawers();
+                return true;
+            }
+        });
+
+        drawerToggle = new ActionBarDrawerToggle(this, drawerLayout, R.string.open_drawer, R.string.close_drawer);
+        drawerLayout.setDrawerListener(drawerToggle);
+        drawerToggle.syncState();
+
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
+        mapLayout = (SlideUpPanelLayout) findViewById(R.id.map_layout);
+        mapLayout.setFragmentManager(fm);
+
+        //initialize map
+        mapFragment = (BaseMapFragment) fm.findFragmentByTag(MAP_FRAGMENT_TAG);
+
+        if (mapFragment == null) {
+            mapFragment = BaseMapFragment.newInstance();
+            fm.beginTransaction().add(mapFragment, MAP_FRAGMENT_TAG).commit();
+        }
+
+        mapLayout.setBackgroundFragment(mapFragment);
+        mapLayout.setListener(this);
 
         adView = (AdView) findViewById(R.id.adView);
 
@@ -206,9 +260,9 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         if (status != ConnectionResult.SUCCESS) {
             getFragmentManager().beginTransaction().hide(mapFragment).commit();
             Dialog errDialog = gaa.getErrorDialog(this, status, 0);
-            errDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            errDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
                 @Override
-                public void onCancel(DialogInterface dialog) {
+                public void onDismiss(DialogInterface dialog) {
                     finish();
                 }
             });
@@ -230,14 +284,16 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         searchMenuItem = menu.findItem(R.id.action_search);
 
-        final RelativeLayout searchLayout = (RelativeLayout) MenuItemCompat.getActionView(searchMenuItem);
+        searchLayout = (RelativeLayout) MenuItemCompat.getActionView(searchMenuItem);
         searchView = (DelayAutoCompleteTextView) searchLayout.findViewById(R.id.search_view);
 
-        searchAdapter = new PlacesSuggestionAdapter(this, R.layout.support_simple_spinner_dropdown_item, googleApiClient, null, null);
+        //originally R.layout.support_simple_spinner_dropdown_item
+        searchAdapter = new PlacesSuggestionAdapter(this, R.layout.search_suggestion_item, googleApiClient, null, null);
         searchView.setAdapter(searchAdapter);
         searchView.setOnItemClickListener(new SuggestionClickListener());
+        //searchView.setDropDownVerticalOffset(16);
 
-        ImageView clearSearchButton = (ImageView) MenuItemCompat.getActionView(searchMenuItem).findViewById(R.id.clear_search);
+        ImageButton clearSearchButton = (ImageButton) searchLayout.findViewById(R.id.clear_search);
         clearSearchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -248,28 +304,62 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         MenuItemCompat.setOnActionExpandListener(searchMenuItem, new MenuItemCompat.OnActionExpandListener() {
             @Override
             public boolean onMenuItemActionExpand(MenuItem item) {
-                setActionBarAlpha(true);
+                setActionBarOpaque(true);
+                getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+
+                //show keyboard
+                searchView.requestFocus();
+                //must delay slightly for some reason (race condition?)
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        InputMethodManager imm = (InputMethodManager) MainActivity.this.getSystemService(Context.INPUT_METHOD_SERVICE);
+                        imm.showSoftInput(searchView, 0);
+                    }
+                }, 200);
+
                 return true;
             }
 
             @Override
             public boolean onMenuItemActionCollapse(MenuItem item) {
-                setActionBarAlpha(false);
+                setActionBarOpaque(false);
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
+                InputMethodManager imm = (InputMethodManager) MainActivity.this.getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(searchView.getWindowToken(), 0);
+
                 return true;
             }
         });
-
+/*
         LayoutTransition transition = new LayoutTransition();
         ObjectAnimator appearingAnim = ObjectAnimator.ofFloat(null, "alpha", 0f, 1f);
         ObjectAnimator disappearingAnim = ObjectAnimator.ofFloat(null, "alpha", 1f, 0f);
         transition.setAnimator(LayoutTransition.APPEARING, appearingAnim);
-//        transition.setAnimator(LayoutTransition.CHANGE_APPEARING, appearingAnim);
         transition.setAnimator(LayoutTransition.DISAPPEARING, disappearingAnim);
-//        transition.setAnimator(LayoutTransition.CHANGE_DISAPPEARING, disappearingAnim);
         toolbar.setLayoutTransition(transition);
-//        searchLayout.setLayoutTransition(transition);
-
+        searchLayout.setLayoutTransition(transition);
+*/
         return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if(drawerToggle.onOptionsItemSelected(item))
+            return true;
+
+        switch (item.getItemId()) {
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        drawerToggle.onConfigurationChanged(newConfig);
     }
 
     @Override
@@ -319,22 +409,21 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         outState.putParcelable(ACTIVE_ITEM_KEY, activeItem);
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-
-        switch (item.getItemId()) {
-
-            default:
-                return super.onOptionsItemSelected(item);
-        }
-    }
-
     public void onMapReady(GoogleMap googleMap) {
         if (firstLaunch) {
-            getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
-            progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
-            progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
-            new LoadPhotosTask(mapFragment.getClusterManager(), mapFragment.getCachedItems(), this).execute();
+            ArrayList<String> toRequest = new ArrayList<>();
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                toRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
+
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                toRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                ActivityCompat.requestPermissions(this, toRequest.toArray(new String[toRequest.size()]), MULTI_REQUEST);
+            } else {
+                getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
+                progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
+                progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
+                new LoadPhotosTask(mapFragment.getClusterManager(), getContentResolver(), mapFragment.getCachedItems(), this).execute();
+            }
         }
 
         gMap = googleMap;
@@ -381,7 +470,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         activeItem = null;
     }
 
-    private void setActionBarAlpha(boolean turnOpaque) {
+    private void setActionBarOpaque(boolean turnOpaque) {
         final ColorDrawable toolbarDrawable = (ColorDrawable) toolbar.getBackground();
 
         //make action bar fully opaque if photo list fragment is showing, otherwise translucent
@@ -476,6 +565,16 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             fadeAnim.start();
         }
 
+        //alert the user if no geotagged photos are found
+        if (markers.isEmpty()) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setMessage(R.string.no_photos_dialog_msg);
+            builder.setTitle(R.string.no_photos_dialog_title);
+            builder.setPositiveButton("OK", null);
+
+            AlertDialog dialog = builder.create();
+            dialog.show();
+        }
         mapFragment.cacheItems(markers);
     }
 
@@ -496,7 +595,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList, appBarLayout.getHeight());
 
         showToolbar();
-        setActionBarAlpha(gridFragmentShowing);
+        setActionBarOpaque(gridFragmentShowing);
         removeInfoFragment();
 
         FragmentManager fm = getFragmentManager();
@@ -532,15 +631,17 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         getFragmentManager().popBackStackImmediate(); //hide grid fragment
 
         gridFragmentShowing = false;
-        setActionBarAlpha(gridFragmentShowing);
+        setActionBarOpaque(gridFragmentShowing);
         addInfoFragment(photoItem);
     }
 
     @Override
     public void onPhotoGridFragmentShown() {
+        /*
         if (mapFragment != null) {
             getFragmentManager().beginTransaction().hide(mapFragment).commit();
         }
+        */
 
         searchMenuItem.setVisible(false);
         toolbar.setTitle(R.string.select_photo);
@@ -548,9 +649,11 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
     @Override
     public void onPhotoGridFragmentHidden() {
+        /*
         if (mapFragment != null) {
             getFragmentManager().beginTransaction().show(mapFragment).commit();
         }
+        */
 
         searchMenuItem.setVisible(true);
         toolbar.setTitle(R.string.main_title);
@@ -589,7 +692,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         gridFragmentShowing = false;
         hideToolbar();
-        setActionBarAlpha(gridFragmentShowing);
+        setActionBarOpaque(gridFragmentShowing);
 
         if (MenuItemCompat.isActionViewExpanded(searchMenuItem)) {
             MenuItemCompat.collapseActionView(searchMenuItem);
@@ -622,10 +725,9 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     public void onConnected(Bundle connectionHint) {
 
         //request location permission for Android 6.0+
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, COARSE_LOCATION);
-        } else {
-           setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
+            mapFragment.enableMyLocation();
         }
     }
 
@@ -674,12 +776,92 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == COARSE_LOCATION) {
+        if (requestCode == MULTI_REQUEST) {
 
-            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
-            } else {
-                setUpLocation(null);
+            ArrayList<String> denied = new ArrayList<>();
+            for (int i = 0; i < permissions.length; i++) {
+                if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    setUpGrantedPermission(permissions[i]);
+                } else {
+                    denied.add(permissions[i]);
+                }
+            }
+
+            if (denied.size() > 1) {
+                final String[] deniedPermissions = denied.toArray(new String[denied.size()]);
+                Snackbar snackbar = Snackbar.make(mapLayout, "Picmapper needs additional permissions", Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction("Allow", new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        ActivityCompat.requestPermissions(MainActivity.this, deniedPermissions, MULTI_REQUEST);
+                    }
+                });
+                snackbar.show();
+            } else if (denied.size() > 0) {
+                final String[] deniedPermission = denied.toArray(new String[denied.size()]);
+                String snackbarMsg;
+                int duration = Snackbar.LENGTH_LONG;
+                if (denied.get(0).equals(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    snackbarMsg = "Picmapper would like to access your location";
+                } else if (denied.get(0).equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    snackbarMsg = "Picmapper needs permission to load photos";
+                    duration = Snackbar.LENGTH_INDEFINITE;
+                } else { //something went wrong, should not reach here
+                    snackbarMsg = "Picmapper needs your permission";
+                }
+
+                Snackbar snackbar = Snackbar.make(mapLayout, snackbarMsg, duration);
+                snackbar.setAction("Allow", new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        ActivityCompat.requestPermissions(MainActivity.this, deniedPermission, MULTI_REQUEST);
+                    }
+                });
+                snackbar.show();
+            }
+        }
+    }
+
+    @SuppressWarnings({"MissingPermission"})
+    private void setUpGrantedPermission(String permission) {
+        if (permission.equals(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            setUpLocation(LocationServices.FusedLocationApi.getLastLocation(googleApiClient));
+            mapFragment.enableMyLocation();
+
+        } else if (permission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+            getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
+            progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
+            progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
+            new LoadPhotosTask(mapFragment.getClusterManager(), getContentResolver(), mapFragment.getCachedItems(), this).execute();
+        }
+    }
+
+    private void openAdditionalPhotos() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2)
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+
+        startActivityForResult(Intent.createChooser(intent, "Get photos from"), OPEN_DIR_REQUEST);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == OPEN_DIR_REQUEST) {
+
+            ArrayList<Uri> photoUris = new ArrayList<Uri>();
+            photoUris.add(data.getData());
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                ClipData clipData = data.getClipData();
+
+                if (clipData != null) {
+                    for (int i = 0; i < clipData.getItemCount(); i++) {
+                        photoUris.add(clipData.getItemAt(i).getUri());
+                    }
+                }
             }
         }
     }

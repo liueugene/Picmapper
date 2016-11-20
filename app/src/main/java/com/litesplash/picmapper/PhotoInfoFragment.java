@@ -10,7 +10,6 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.content.res.Configuration;
 import android.location.Geocoder;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.DisplayMetrics;
@@ -20,7 +19,6 @@ import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
@@ -67,7 +65,7 @@ public class PhotoInfoFragment extends Fragment implements AnimImageView.Callbac
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        View infoOverlay = inflater.inflate(R.layout.photo_info_frag_layout, container, false);
+        View infoOverlay = inflater.inflate(R.layout.photo_info_panel_layout, container, false);
 
         item = getArguments().getParcelable("photoItem");
         animDuration = getResources().getInteger(android.R.integer.config_mediumAnimTime);
@@ -80,10 +78,8 @@ public class PhotoInfoFragment extends Fragment implements AnimImageView.Callbac
     }
 
     private void prepareView(final View infoOverlayView, Bundle args) {
-        imageView = (AnimImageView) infoOverlayView.findViewById(R.id.info_imageview);
-        imageView.setOnReadyToAnimateCallback(this);
-
-        final String file = "file:" + item.getFilePath();
+        imageView = (AnimImageView) infoOverlayView.findViewById(R.id.photo_view);
+        imageView.setCallback(this);
 
         //load image after view is drawn so that it can be resized appropriately
         infoOverlayView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
@@ -104,7 +100,7 @@ public class PhotoInfoFragment extends Fragment implements AnimImageView.Callbac
 
                 if (width > 0 && height > 0) {
                     Picasso.with(getActivity())
-                            .load(file)
+                            .load(item.getFileUri())
                             .resize(width, height)
                             .onlyScaleDown()
                             .centerInside()

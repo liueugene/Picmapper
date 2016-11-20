@@ -14,7 +14,7 @@ import android.widget.AutoCompleteTextView;
 public class DelayAutoCompleteTextView extends AutoCompleteTextView {
 
     private static final int TEXT_CHANGED = 0xABC;
-    private static final int DEFAULT_DELAY = 500;
+    private static final int DEFAULT_DELAY = 300;
 
     private final Handler handler = new Handler() {
         @Override

@@ -1,6 +1,7 @@
 package com.litesplash.picmapper;
 
 import android.app.Activity;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -110,7 +111,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         gMap = googleMap;
-        gMap.setMyLocationEnabled(true);
         gMap.setOnCameraChangeListener(this);
         gMap.setOnMarkerClickListener(this);
         gMap.setOnMapClickListener(this);
@@ -137,6 +137,10 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         }
 
         mapReady = true;
+    }
+
+    public void enableMyLocation() throws SecurityException {
+        gMap.setMyLocationEnabled(true);
     }
 
     @Override
@@ -175,12 +179,16 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     @Override
     public void onCameraChange(CameraPosition cameraPosition) {
         listener.onCameraChange(cameraPosition);
-        clusterManager.onCameraChange(cameraPosition);
+        clusterManager.onCameraIdle();
     }
 
     @Override
     public void onMapClick(LatLng latLng) {
         listener.onMapClick(latLng);
+    }
+
+    public void setMapType(int type) {
+        gMap.setMapType(type);
     }
 
     public boolean setLastMarkerInactive() {
@@ -247,7 +255,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     }
 
     public void createTestMarker() {
-        testItem = new PhotoItem(0, 0, "");
+        testItem = new PhotoItem(0, 0, (Uri)null, "test");
         gMap.addMarker(new MarkerOptions().position(testItem.getPosition()).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)).draggable(true).title("test"));
     }
 

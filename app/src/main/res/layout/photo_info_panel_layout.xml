@@ -12,7 +12,7 @@
         <com.litesplash.picmapper.AnimImageView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/info_imageview"
+            android:id="@+id/photo_view"
             android:scaleType="center"
             android:adjustViewBounds="true"
             android:layout_alignParentTop="true" />
@@ -23,7 +23,7 @@
             android:textAppearance="?android:attr/textAppearanceLarge"
             android:text="Filename.jpg"
             android:id="@+id/filename"
-            android:layout_below="@+id/info_imageview"
+            android:layout_below="@+id/photo_view"
             android:layout_alignParentStart="true"
             android:layout_alignParentLeft="true" />
 

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+
+        <item
+            android:id="@+id/road_view"
+            android:checked="true"
+            android:icon="@drawable/ic_directions_car_24dp"
+            android:title="@string/road_view"/>
+
+        <item
+            android:id="@+id/satellite_view"
+            android:checked="false"
+            android:icon="@drawable/ic_satellite_24dp"
+            android:title="@string/satellite_view"/>
+
+        <item
+            android:id="@+id/terrain_view"
+            android:checked="false"
+            android:icon="@drawable/ic_terrain_24dp"
+            android:title="@string/terrain_view"/>
+    </group>
+<!--
+    <item
+        android:id="@+id/open_storage"
+        android:icon="@drawable/ic_search_24dp"
+        android:title="Open storage" />
+-->
+
+</menu>

@@ -1,1 +1,12 @@
+*.apk
+*.ap_
+*.dex
+*.class
+private_keys.xml
+*.iml
+.idea
+.gradle/
+/local.properties
+.DS_Store
 /build
+/captures

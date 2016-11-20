@@ -36,7 +36,7 @@ public class AnimImageView extends ImageView implements Target {
         super(context, attrs, defStyleAttr);
     }
 
-    public void setOnReadyToAnimateCallback(Callback callback) {
+    public void setCallback(Callback callback) {
         this.callback = callback;
     }
 

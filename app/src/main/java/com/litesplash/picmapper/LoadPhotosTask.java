@@ -1,8 +1,12 @@
 package com.litesplash.picmapper;
 
+import android.content.ContentResolver;
+import android.database.Cursor;
 import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 
 import com.google.maps.android.clustering.ClusterManager;
@@ -21,11 +25,13 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> 
 
     private static final String LOG_TAG = "LoadPhotosTask";
     private WeakReference<ClusterManager<PhotoItem>> clusterManagerRef;
+    private ContentResolver contentResolver;
     private ArrayList<PhotoItem> markers;
     private Callback callback;
 
-    public LoadPhotosTask(ClusterManager<PhotoItem> clusterManager, ArrayList<PhotoItem> existingMarkers, Callback callback) {
+    public LoadPhotosTask(ClusterManager<PhotoItem> clusterManager, ContentResolver contentResolver, ArrayList<PhotoItem> existingMarkers, Callback callback) {
         clusterManagerRef = new WeakReference<ClusterManager<PhotoItem>>(clusterManager);
+        this.contentResolver = contentResolver;
         this.markers = existingMarkers;
         this.callback = callback;
     }
@@ -34,40 +40,34 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> 
 
         if (markers == null) {
             markers = new ArrayList<PhotoItem>();
-            Queue<File> dirs = new LinkedList<File>();
 
-            dirs.add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM));
-            Log.d(LOG_TAG, "photo directory: " + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath());
-            ExifInterface exifInterface;
+            String[] projection = {MediaStore.Images.Media._ID,
+                    MediaStore.Images.Media.DISPLAY_NAME,
+                    MediaStore.Images.Media.LATITUDE,
+                    MediaStore.Images.Media.LONGITUDE};
 
-            while (!dirs.isEmpty()) {
-                File[] files = dirs.remove().listFiles();
+            Cursor cursor = contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, null);
 
-                if (files == null)
-                    continue;
+            if (cursor == null)
+                return markers;
 
-                for (int i = 0; i < files.length; i++) {
-                    if (files[i].isDirectory()) {
-                        dirs.add(files[i]);
-                        continue;
-                    }
+            int idIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+            int nameIndex = cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME);
+            int latIndex = cursor.getColumnIndex(MediaStore.Images.Media.LATITUDE);
+            int lonIndex = cursor.getColumnIndex(MediaStore.Images.Media.LONGITUDE);
 
-                    try {
-                        //load latitude/longitude coordinates from EXIF data
-                        exifInterface = new ExifInterface(files[i].getAbsolutePath());
-                        float[] latLon = new float[2];
+            while (cursor.moveToNext()) {
 
-                        if (exifInterface.getLatLong(latLon)) {
-                            PhotoItem m = new PhotoItem(latLon[0], latLon[1], files[i]);
-                            markers.add(m);
-                        }
+                long id = cursor.getLong(idIndex);
+                String name = cursor.getString(nameIndex);
+                double latitude = cursor.getDouble(latIndex);
+                double longitude = cursor.getDouble(lonIndex);
+                Uri uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Long.toString(id));
 
-                    } catch (IOException e) {
-                        Log.e(LOG_TAG, "IO exception when loading photo");
-                    }
-
-                }
+                markers.add(new PhotoItem(latitude, longitude, uri, name));
             }
+
+            cursor.close();
         }
 
         ClusterManager<PhotoItem> clusterManager = clusterManagerRef.get();

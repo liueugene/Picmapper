@@ -2,8 +2,7 @@ package com.litesplash.picmapper;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.text.Spannable;
-import android.text.SpannableStringBuilder;
+import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -25,7 +24,6 @@ import com.google.android.gms.maps.model.LatLngBounds;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -43,7 +41,8 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
 
     private LayoutInflater inflater;
     private int resource;
-    private int fieldId = 0;
+    private int primaryFieldId = R.id.primary_text_view;
+    private int secondaryFieldId = R.id.secondary_text_view;
 
     public PlacesSuggestionAdapter(Context context, int resource, GoogleApiClient client, LatLngBounds bounds, AutocompleteFilter filter) {
         super(context, resource);
@@ -82,7 +81,7 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
             @Override
             protected void publishResults(CharSequence constraint, FilterResults results) {
 
-                if (results != null && results.count > 0)
+                if (results != null)
                     notifyDataSetChanged();
                 else
                     notifyDataSetInvalidated();
@@ -98,7 +97,8 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         View view;
-        TextView text;
+        TextView primaryTextView;
+        TextView secondaryTextView;
 
         if (convertView == null) {
             view = inflater.inflate(resource, parent, false);
@@ -107,13 +107,8 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
         }
 
         try {
-            if (fieldId == 0) {
-                //  If no custom field is assigned, assume the whole resource is a TextView
-                text = (TextView) view;
-            } else {
-                //  Otherwise, find the TextView field within the layout
-                text = (TextView) view.findViewById(fieldId);
-            }
+            primaryTextView = (TextView) view.findViewById(primaryFieldId);
+            secondaryTextView = (TextView) view.findViewById(secondaryFieldId);
         } catch (ClassCastException e) {
             Log.e("ArrayAdapter", "You must supply a resource ID for a TextView");
             throw new IllegalStateException(
@@ -121,22 +116,17 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
         }
 
         PlaceSuggestion item = getItem(position);
-        List<? extends AutocompletePrediction.Substring> matches = item.matchedSubstrings;
-        Spannable styledText = new SpannableStringBuilder(item.description);
-
-        for (AutocompletePrediction.Substring match : matches) {
-            int start = match.getOffset();
-            int end = start + match.getLength();
-            styledText.setSpan(new ForegroundColorSpan(Color.argb(138, 0, 0, 0)), start, end, 0);
-        }
-
-        text.setText(styledText);
+        primaryTextView.setText(item.primaryText);
+        secondaryTextView.setText(item.secondaryText);
 
         return view;
     }
 
     @Override
     public int getCount() {
+        if (suggestions == null)
+            return 0;
+
         return suggestions.size();
     }
 
@@ -188,27 +178,27 @@ public class PlacesSuggestionAdapter extends ArrayAdapter {
         //load data from autocomplete buffer into list
         while (iterator.hasNext()) {
             AutocompletePrediction prediction = iterator.next();
-            suggestionsList.add(new PlaceSuggestion(prediction.getPlaceId(), prediction.getDescription(), prediction.getMatchedSubstrings()));
+            CharacterStyle matchStyle = new ForegroundColorSpan(Color.argb(138, 0, 0, 0));
+            suggestionsList.add(new PlaceSuggestion(prediction.getPlaceId(), prediction.getPrimaryText(matchStyle), prediction.getSecondaryText(matchStyle)));
         }
 
         buffer.release();
         return suggestionsList;
-        //*/
     }
 
     public class PlaceSuggestion {
         String placeId;
-        String description;
-        List<? extends AutocompletePrediction.Substring> matchedSubstrings;
+        CharSequence primaryText;
+        CharSequence secondaryText;
 
-        public PlaceSuggestion(String placeId, String description, List<? extends AutocompletePrediction.Substring> matchedSubstrings) {
+        public PlaceSuggestion(String placeId, CharSequence primaryText, CharSequence secondaryText) {
             this.placeId = placeId;
-            this.description = description;
-            this.matchedSubstrings = matchedSubstrings;
+            this.primaryText = primaryText;
+            this.secondaryText = secondaryText;
         }
 
         public String toString() {
-            return description;
+            return primaryText.toString();
         }
     }
 }

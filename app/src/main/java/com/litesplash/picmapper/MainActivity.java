@@ -422,7 +422,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
                 getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
                 progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
                 progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
-                new LoadPhotosTask(mapFragment.getClusterManager(), getContentResolver(), mapFragment.getCachedItems(), this).execute();
+                new LoadPhotosTask(getContentResolver(), mapFragment.getCachedItems(), this).execute();
             }
         }
 
@@ -574,6 +574,8 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
             AlertDialog dialog = builder.create();
             dialog.show();
+        } else {
+            mapFragment.onPhotosReady(markers);
         }
         mapFragment.cacheItems(markers);
     }
@@ -832,7 +834,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
             progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
             progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
-            new LoadPhotosTask(mapFragment.getClusterManager(), getContentResolver(), mapFragment.getCachedItems(), this).execute();
+            new LoadPhotosTask(getContentResolver(), mapFragment.getCachedItems(), this).execute();
         }
     }
 

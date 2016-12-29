@@ -139,6 +139,11 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         mapReady = true;
     }
 
+    public void onPhotosReady(Collection<PhotoItem> markers) {
+        clusterManager.addItems(markers);
+        clusterManager.cluster();
+    }
+
     public void enableMyLocation() throws SecurityException {
         gMap.setMyLocationEnabled(true);
     }

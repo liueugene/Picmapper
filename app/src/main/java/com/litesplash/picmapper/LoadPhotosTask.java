@@ -24,13 +24,11 @@ import java.util.Queue;
 public class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> {
 
     private static final String LOG_TAG = "LoadPhotosTask";
-    private WeakReference<ClusterManager<PhotoItem>> clusterManagerRef;
     private ContentResolver contentResolver;
     private ArrayList<PhotoItem> markers;
     private Callback callback;
 
-    public LoadPhotosTask(ClusterManager<PhotoItem> clusterManager, ContentResolver contentResolver, ArrayList<PhotoItem> existingMarkers, Callback callback) {
-        clusterManagerRef = new WeakReference<ClusterManager<PhotoItem>>(clusterManager);
+    public LoadPhotosTask(ContentResolver contentResolver, ArrayList<PhotoItem> existingMarkers, Callback callback) {
         this.contentResolver = contentResolver;
         this.markers = existingMarkers;
         this.callback = callback;
@@ -70,22 +68,10 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, ArrayList<PhotoItem>> 
             cursor.close();
         }
 
-        ClusterManager<PhotoItem> clusterManager = clusterManagerRef.get();
-
-        if (clusterManager != null)
-            clusterManager.addItems(markers);
-
         return markers;
     }
 
     protected void onPostExecute(ArrayList<PhotoItem> markers) {
-
-        ClusterManager<PhotoItem> clusterManager = clusterManagerRef.get();
-
-        if (clusterManager != null) {
-            clusterManager.cluster();
-        }
-
         if (callback != null) {
             callback.onPhotosReady(markers);
         }

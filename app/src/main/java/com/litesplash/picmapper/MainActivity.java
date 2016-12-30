@@ -551,7 +551,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     }
 
     @Override
-    public void onPhotosReady(ArrayList<PhotoItem> markers) {
+    public void onPhotosReady(ArrayList<PhotoItem> taggedItems, ArrayList<PhotoItem> untaggedItems) {
 
         if (progressLayout != null) {
             ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(progressLayout, "alpha", progressLayout.getAlpha(), 0f);
@@ -566,7 +566,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         }
 
         //alert the user if no geotagged photos are found
-        if (markers.isEmpty()) {
+        if (taggedItems.isEmpty()) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setMessage(R.string.no_photos_dialog_msg);
             builder.setTitle(R.string.no_photos_dialog_title);
@@ -575,9 +575,9 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             AlertDialog dialog = builder.create();
             dialog.show();
         } else {
-            mapFragment.onPhotosReady(markers);
+            mapFragment.onPhotosReady(taggedItems);
         }
-        mapFragment.cacheItems(markers);
+        mapFragment.cacheItems(taggedItems);
     }
 
     @Override

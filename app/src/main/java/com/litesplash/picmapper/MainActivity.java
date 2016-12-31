@@ -642,17 +642,15 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             mapFragment.setUnclusteredMarker(new MarkerOptions()
                     .position(photoItem.getPosition())
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+            getFragmentManager().popBackStackImmediate(); //hide grid fragment
+            gridFragmentShowing = false;
+            setActionBarOpaque(false);
             addInfoFragment(photoItem);
 
         } else { //not geotagged, launch photo tagging activity
             Intent intent = new Intent(this, TagLocationActivity.class);
             startActivity(intent);
         }
-
-        getFragmentManager().popBackStackImmediate(); //hide grid fragment
-        gridFragmentShowing = false;
-        setActionBarOpaque(false);
-
     }
 
     @Override

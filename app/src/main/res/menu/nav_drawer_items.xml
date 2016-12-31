@@ -21,6 +21,11 @@
             android:icon="@drawable/ic_terrain_24dp"
             android:title="@string/terrain_view"/>
     </group>
+
+    <item
+        android:id="@+id/untagged_photos"
+        android:icon="@drawable/ic_search_24dp"
+        android:title="@string/untagged_photos"/>
 <!--
     <item
         android:id="@+id/open_storage"

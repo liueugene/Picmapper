@@ -120,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     private PlacesSuggestionAdapter searchAdapter;
 
     private PhotoItem activeItem;
+    private ArrayList<PhotoItem> untaggedItems;
 
     private int toolbarHeight;
     private int statusBarHeight;
@@ -188,12 +189,16 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         navDrawer.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(MenuItem item) {
-/*
-                if (item.getItemId() == R.id.open_storage) {
-                    openAdditionalPhotos();
+
+                if (item.getItemId() == R.id.untagged_photos) {
+                    if (untaggedItems == null)
+                        return false;
+
+                    drawerLayout.closeDrawers();
+                    showPhotoGrid(untaggedItems, PhotoGridFragment.UNTAGGED);
                     return true;
                 }
-*/
+
 
                 int type;
                 switch (item.getItemId()) {
@@ -578,6 +583,8 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             mapFragment.onPhotosReady(taggedItems);
         }
         mapFragment.cacheItems(taggedItems);
+        this.untaggedItems = untaggedItems;
+
     }
 
     @Override
@@ -588,13 +595,17 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
     @Override
     public void onClusterClick(Collection<PhotoItem> items) {
+        showPhotoGrid(items, PhotoGridFragment.GEOTAGGED);
+    }
+
+    private void showPhotoGrid(Collection<PhotoItem> items, int photoType) {
         if (gridFragmentShowing) //avoid duplicate fragments caused by extra tapping
             return;
 
         gridFragmentShowing = true;
 
         ArrayList<PhotoItem> markerArrayList = new ArrayList<PhotoItem>(items);
-        PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList, appBarLayout.getHeight());
+        PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList, appBarLayout.getHeight(), photoType);
 
         showToolbar();
         setActionBarOpaque(gridFragmentShowing);
@@ -625,16 +636,23 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     }
 
     @Override
-    public void onPhotoGridItemClick(PhotoItem photoItem) {
-        mapFragment.setUnclusteredMarker(new MarkerOptions()
-                .position(photoItem.getPosition())
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+    public void onPhotoGridItemClick(PhotoItem photoItem, int photoType) {
+
+        if (photoType == PhotoGridFragment.GEOTAGGED) {
+            mapFragment.setUnclusteredMarker(new MarkerOptions()
+                    .position(photoItem.getPosition())
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+            addInfoFragment(photoItem);
+
+        } else { //not geotagged, launch photo tagging activity
+            Intent intent = new Intent(this, TagLocationActivity.class);
+            startActivity(intent);
+        }
 
         getFragmentManager().popBackStackImmediate(); //hide grid fragment
-
         gridFragmentShowing = false;
-        setActionBarOpaque(gridFragmentShowing);
-        addInfoFragment(photoItem);
+        setActionBarOpaque(false);
+
     }
 
     @Override
@@ -836,6 +854,10 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
             progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
             new LoadPhotosTask(getContentResolver(), mapFragment.getCachedItems(), this).execute();
         }
+    }
+
+    private void handleUntaggedPhotos() {
+
     }
 
     private void openAdditionalPhotos() {

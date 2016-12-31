@@ -23,8 +23,14 @@ public class PhotoGridFragment extends Fragment implements PhotoGridAdapter.OnIt
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String MARKER_ARRAY_LIST = "markerArrayList";
     private static final String TOP_MARGIN = "topMargin";
+    private static final String PHOTO_TYPE = "photoType";
+
     private static final String LOAD_PHOTO_TAG = "loadPhoto";
     private static final String LOG_TAG = "PhotoGridFragment";
+
+    //flags to specify what types of photos are listed
+    static final int GEOTAGGED = 0;
+    static final int UNTAGGED = 1;
 
     private Context context;
     private Listener listener;
@@ -34,14 +40,16 @@ public class PhotoGridFragment extends Fragment implements PhotoGridAdapter.OnIt
     private RecyclerView.Adapter adapter;
 
     private int topMargin;
+    private int photoType;
 
     private boolean exiting = false;
 
-    public static PhotoGridFragment newInstance(ArrayList<PhotoItem> markerArrayList, int topMargin) {
+    public static PhotoGridFragment newInstance(ArrayList<PhotoItem> markerArrayList, int topMargin, int type) {
         PhotoGridFragment fragment = new PhotoGridFragment();
         Bundle args = new Bundle();
         args.putParcelableArrayList(MARKER_ARRAY_LIST, markerArrayList);
         args.putInt(TOP_MARGIN, topMargin);
+        args.putInt(PHOTO_TYPE, type);
         fragment.setArguments(args);
         return fragment;
     }
@@ -56,6 +64,7 @@ public class PhotoGridFragment extends Fragment implements PhotoGridAdapter.OnIt
         if (getArguments() != null) {
             markerArrayList = getArguments().getParcelableArrayList(MARKER_ARRAY_LIST);
             topMargin = getArguments().getInt(TOP_MARGIN);
+            photoType = getArguments().getInt(PHOTO_TYPE);
         }
         context = getActivity();
     }
@@ -141,11 +150,11 @@ public class PhotoGridFragment extends Fragment implements PhotoGridAdapter.OnIt
     @Override
     public void onPhotoItemClick(View view, int position) {
         PhotoItem pm = markerArrayList.get(position);
-        listener.onPhotoGridItemClick(pm);
+        listener.onPhotoGridItemClick(pm, photoType);
     }
 
     public interface Listener {
-        void onPhotoGridItemClick(PhotoItem photoItem);
+        void onPhotoGridItemClick(PhotoItem photoItem, int photoType);
         void onPhotoGridFragmentShown();
         void onPhotoGridFragmentHidden();
     }

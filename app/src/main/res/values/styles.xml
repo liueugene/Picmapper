@@ -21,4 +21,8 @@
     <style name="condensed_gray_text" parent="gray_text">
         <item name="android:fontFamily">sans-serif-condensed</item>
     </style>
+
+    <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+
+    <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 </resources>

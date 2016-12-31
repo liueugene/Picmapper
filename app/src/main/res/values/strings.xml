@@ -10,9 +10,11 @@
     <string name="road_view">Road</string>
     <string name="satellite_view">Satellite</string>
     <string name="terrain_view">Terrain</string>
+    <string name="untagged_photos">Untagged photos</string>
     <string name="open_drawer">Open drawer</string>
     <string name="close_drawer">Close drawer</string>
 
     <string name="no_photos_dialog_title">No photos found</string>
     <string name="no_photos_dialog_msg">Picmapper couldn\'t find any photos containing location data.\n\nCheck if location tagging is enabled in your camera settings.</string>
+    <string name="title_activity_tag_location">TagLocationActivity</string>
 </resources>

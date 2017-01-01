@@ -3,4 +3,8 @@
     <color name="translucent_white">#80ffffff</color>
     <color name="translucent_gray">#80eeeeee</color>
     <color name="white_opacity_90">#e6ffffff</color>
+    <color name="primary_color">#ff6f00</color>
+    <color name="primary_color_dark">#b24d00</color>
+    <color name="accent_color">#0091ea</color>
+    <color name="primary_text_material_light">#ffffff</color>
 </resources>

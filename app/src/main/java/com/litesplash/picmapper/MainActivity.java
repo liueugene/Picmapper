@@ -175,11 +175,13 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         toolbar.setPadding(0, statusBarHeight, 0, 0);
         appBarLayout = (AppBarLayout) findViewById(R.id.app_bar);
 
+        /*
         //remove compatibility shadow on API >= 21
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             View compatShadow = appBarLayout.findViewById(R.id.compat_shadow);
             appBarLayout.removeView(compatShadow);
         }
+        */
 
         setSupportActionBar(toolbar);
 
@@ -220,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         });
 
         drawerToggle = new ActionBarDrawerToggle(this, drawerLayout, R.string.open_drawer, R.string.close_drawer);
-        drawerLayout.setDrawerListener(drawerToggle);
+        drawerLayout.addDrawerListener(drawerToggle);
         drawerToggle.syncState();
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -309,7 +311,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         MenuItemCompat.setOnActionExpandListener(searchMenuItem, new MenuItemCompat.OnActionExpandListener() {
             @Override
             public boolean onMenuItemActionExpand(MenuItem item) {
-                setActionBarOpaque(true);
+                //setActionBarOpaque(true);
                 getSupportActionBar().setDisplayHomeAsUpEnabled(false);
 
                 //show keyboard
@@ -328,7 +330,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
             @Override
             public boolean onMenuItemActionCollapse(MenuItem item) {
-                setActionBarOpaque(false);
+                //setActionBarOpaque(false);
                 getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
                 InputMethodManager imm = (InputMethodManager) MainActivity.this.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -457,9 +459,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
     }
 
     private void addInfoFragment(PhotoItem photoItem) {
-
         int adViewPadding;
-
         if (adView != null)
             adViewPadding = adView.getHeight();
         else
@@ -608,7 +608,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
         PhotoGridFragment photoGridFragment = PhotoGridFragment.newInstance(markerArrayList, appBarLayout.getHeight(), photoType);
 
         showToolbar();
-        setActionBarOpaque(gridFragmentShowing);
+        //setActionBarOpaque(gridFragmentShowing);
         removeInfoFragment();
 
         FragmentManager fm = getFragmentManager();
@@ -644,7 +644,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
             getFragmentManager().popBackStackImmediate(); //hide grid fragment
             gridFragmentShowing = false;
-            setActionBarOpaque(false);
+            //setActionBarOpaque(false);
             addInfoFragment(photoItem);
 
         } else { //not geotagged, launch photo tagging activity
@@ -710,7 +710,7 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         gridFragmentShowing = false;
         hideToolbar();
-        setActionBarOpaque(gridFragmentShowing);
+        //setActionBarOpaque(gridFragmentShowing);
 
         if (MenuItemCompat.isActionViewExpanded(searchMenuItem)) {
             MenuItemCompat.collapseActionView(searchMenuItem);

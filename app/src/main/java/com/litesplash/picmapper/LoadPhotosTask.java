@@ -19,9 +19,9 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, LoadPhotosTask.MarkerL
     private ArrayList<PhotoItem> untaggedItems;
     private Callback callback;
 
-    public LoadPhotosTask(ContentResolver contentResolver, ArrayList<PhotoItem> cachedMarkers, Callback callback) {
+    public LoadPhotosTask(ContentResolver contentResolver, ArrayList<PhotoItem> taggedItems, Callback callback) {
         this.contentResolver = contentResolver;
-        this.taggedItems = cachedMarkers;
+        this.taggedItems = taggedItems;
         this.callback = callback;
     }
 

@@ -4,9 +4,7 @@ import android.app.Activity;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -30,7 +28,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private static final String SAVE_OBJECTS = "saveObjects";
     private static final String LAST_ACTIVE_CLUSTER_ITEM = "lastActiveClusterItem";
-    private static final String CACHED_ITEMS = "cachedItems";
+    private static final String LOADED_ITEMS = "loadedItems";
 
     private GoogleMap gMap;
     private ClusterManager<PhotoItem> clusterManager;
@@ -38,7 +36,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private PhotoItem lastActiveClusterItem;
     private Marker lastActiveUnclusteredMarker;
-    private ArrayList<PhotoItem> cachedItems;
 
     private PhotoItem testItem;
 
@@ -46,6 +43,8 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private boolean mapReady;
     private boolean activityReady;
+
+    private ArrayList<PhotoItem> loadedItems;
 
     public static BaseMapFragment newInstance() {
         return new BaseMapFragment();
@@ -60,7 +59,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
             Bundle saveObjects = savedInstanceState.getBundle(SAVE_OBJECTS);
 
             lastActiveClusterItem = saveObjects.getParcelable(LAST_ACTIVE_CLUSTER_ITEM);
-            cachedItems = saveObjects.getParcelableArrayList(CACHED_ITEMS);
         }
 
         getMapAsync(this);
@@ -77,7 +75,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
         Log.d(LOG_TAG, "clusterManager: " + clusterManager);
         Log.d(LOG_TAG, "renderer: " + renderer);
-        Log.d(LOG_TAG, "cachedItems: " + cachedItems);
     }
 
     @Override
@@ -97,7 +94,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         //unparceled by another ClassLoader in the API
         Bundle saveObjects = new Bundle();
         saveObjects.putParcelable(LAST_ACTIVE_CLUSTER_ITEM, lastActiveClusterItem);
-        saveObjects.putParcelableArrayList(CACHED_ITEMS, cachedItems);
         outState.putBundle(SAVE_OBJECTS, saveObjects);
         super.onSaveInstanceState(outState);
     }
@@ -123,10 +119,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         clusterManager.setRenderer(renderer);
         clusterManager.setOnClusterItemClickListener(this);
         clusterManager.setOnClusterClickListener(this);
-
-        if (cachedItems != null) {
-            clusterManager.addItems(cachedItems);
-        }
 
         if (activityReady) {
             listener.onMapReady(googleMap);
@@ -238,11 +230,11 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     }
 
     public void cacheItems(ArrayList<PhotoItem> cachedItems) {
-        this.cachedItems = cachedItems;
+        this.loadedItems = cachedItems;
     }
 
-    public ArrayList<PhotoItem> getCachedItems() {
-        return cachedItems;
+    public ArrayList<PhotoItem> getLoadedItems() {
+        return loadedItems;
     }
 
     @Override
@@ -270,6 +262,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         void onClusterClick(Collection<PhotoItem> items);
         void onCameraChange(CameraPosition cameraPosition);
         void onMapClick(LatLng latLng);
+        ArrayList<PhotoItem> getLoadedItems();
     }
 
     //used to force the API to bring the selected marker to front

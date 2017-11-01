@@ -12,8 +12,15 @@ import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 
 public class TagLocationActivity extends AppCompatActivity implements OnMapReadyCallback {
+    public static final String PHOTO_ITEM = "PHOTO_ITEM";
+    public static final String TAG_TYPE = "TAG_TYPE";
+
+    public static final int NEW_TAG = 0;
+    public static final int EDIT_TAG = 1;
 
     private MapFragment mapFragment;
+    private PhotoItem photoItem;
+    private int tagType;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,8 +39,15 @@ public class TagLocationActivity extends AppCompatActivity implements OnMapReady
         });
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+
         mapFragment = (MapFragment) getFragmentManager().findFragmentById(R.id.tagging_map);
         mapFragment.getMapAsync(this);
+
+        Bundle extras = getIntent().getExtras();
+        if (extras != null) {
+            photoItem = extras.getParcelable(PHOTO_ITEM);
+            tagType = extras.getInt(TAG_TYPE);
+        }
 
     }
 

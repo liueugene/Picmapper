@@ -100,7 +100,7 @@ public class PhotoInfoFragment extends Fragment implements AnimImageView.Callbac
 
                 if (width > 0 && height > 0) {
                     Picasso.with(getActivity())
-                            .load(item.getFileUri())
+                            .load(item.getContentUri())
                             .resize(width, height)
                             .onlyScaleDown()
                             .centerInside()

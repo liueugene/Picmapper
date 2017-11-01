@@ -649,6 +649,8 @@ public class MainActivity extends AppCompatActivity implements BaseMapFragment.L
 
         } else { //not geotagged, launch photo tagging activity
             Intent intent = new Intent(this, TagLocationActivity.class);
+            intent.putExtra(TagLocationActivity.PHOTO_ITEM, photoItem);
+            intent.putExtra(TagLocationActivity.TAG_TYPE, TagLocationActivity.NEW_TAG);
             startActivity(intent);
         }
     }

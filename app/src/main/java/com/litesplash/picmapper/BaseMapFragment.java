@@ -1,10 +1,16 @@
 package com.litesplash.picmapper;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompatSideChannelService;
 import android.util.Log;
+import android.util.LruCache;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -28,7 +34,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private static final String SAVE_OBJECTS = "saveObjects";
     private static final String LAST_ACTIVE_CLUSTER_ITEM = "lastActiveClusterItem";
-    private static final String LOADED_ITEMS = "loadedItems";
+    private static final String CACHED_ITEMS = "cachedItems";
 
     private GoogleMap gMap;
     private ClusterManager<PhotoItem> clusterManager;
@@ -36,6 +42,9 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private PhotoItem lastActiveClusterItem;
     private Marker lastActiveUnclusteredMarker;
+    private ArrayList<PhotoItem> cachedItems;
+    LruCache<PhotoItem, Bitmap> thumbnailCache;
+
 
     private PhotoItem testItem;
 
@@ -43,8 +52,6 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     private boolean mapReady;
     private boolean activityReady;
-
-    private ArrayList<PhotoItem> loadedItems;
 
     public static BaseMapFragment newInstance() {
         return new BaseMapFragment();
@@ -59,7 +66,18 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
             Bundle saveObjects = savedInstanceState.getBundle(SAVE_OBJECTS);
 
             lastActiveClusterItem = saveObjects.getParcelable(LAST_ACTIVE_CLUSTER_ITEM);
+            cachedItems = saveObjects.getParcelableArrayList(CACHED_ITEMS);
         }
+
+        thumbnailCache = new LruCache<PhotoItem, Bitmap>(2 * 1024 * 1024) {
+            @Override
+            protected int sizeOf(PhotoItem key, Bitmap value) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT)
+                    return value.getByteCount();
+                else
+                    return value.getAllocationByteCount();
+            }
+        };
 
         getMapAsync(this);
     }
@@ -75,6 +93,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
         Log.d(LOG_TAG, "clusterManager: " + clusterManager);
         Log.d(LOG_TAG, "renderer: " + renderer);
+        Log.d(LOG_TAG, "cachedItems: " + cachedItems);
     }
 
     @Override
@@ -94,6 +113,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         //unparceled by another ClassLoader in the API
         Bundle saveObjects = new Bundle();
         saveObjects.putParcelable(LAST_ACTIVE_CLUSTER_ITEM, lastActiveClusterItem);
+        saveObjects.putParcelableArrayList(CACHED_ITEMS, cachedItems);
         outState.putBundle(SAVE_OBJECTS, saveObjects);
         super.onSaveInstanceState(outState);
     }
@@ -111,14 +131,17 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         gMap.setOnMarkerClickListener(this);
         gMap.setOnMapClickListener(this);
         gMap.setOnMarkerDragListener(this);
-        gMap.setInfoWindowAdapter(new DummyInfoWindowAdapter());
 
         clusterManager = new ClusterManager<PhotoItem>(getActivity().getApplicationContext(), gMap);
-        renderer = new CustomClusterRenderer<PhotoItem>(getActivity().getApplicationContext(), gMap, clusterManager);
+        renderer = new CustomClusterRenderer<PhotoItem>(getActivity().getApplicationContext(), gMap, clusterManager, thumbnailCache);
 
         clusterManager.setRenderer(renderer);
         clusterManager.setOnClusterItemClickListener(this);
         clusterManager.setOnClusterClickListener(this);
+
+        if (cachedItems != null) {
+            clusterManager.addItems(cachedItems);
+        }
 
         if (activityReady) {
             listener.onMapReady(googleMap);
@@ -198,7 +221,12 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         if (lastActiveClusterItem != null) {
             Marker marker = renderer.getMarker(lastActiveClusterItem);
             if (marker != null) {
-                marker.setIcon(BitmapDescriptorFactory.defaultMarker());
+                // restore thumbnail from cache if available
+                Bitmap thumb = thumbnailCache.get(lastActiveClusterItem);
+                if (thumb == null)
+                    marker.setIcon(BitmapDescriptorFactory.defaultMarker());
+                else
+                    marker.setIcon(BitmapDescriptorFactory.fromBitmap(thumb));
                 lastActiveClusterItem = null;
                 return true;
             }
@@ -209,12 +237,12 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
 
     public void setUnclusteredMarker(MarkerOptions options) {
         lastActiveUnclusteredMarker = gMap.addMarker(options);
-        lastActiveUnclusteredMarker.showInfoWindow();
+        lastActiveUnclusteredMarker.setZIndex(1.0f);
     }
 
     public void setActiveMarker(Marker marker) {
         marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-        marker.showInfoWindow();
+        marker.setZIndex(1.0f);
     }
 
     public Marker getActiveMarker() {
@@ -230,11 +258,11 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     }
 
     public void cacheItems(ArrayList<PhotoItem> cachedItems) {
-        this.loadedItems = cachedItems;
+        this.cachedItems = cachedItems;
     }
 
-    public ArrayList<PhotoItem> getLoadedItems() {
-        return loadedItems;
+    public ArrayList<PhotoItem> getCachedItems() {
+        return cachedItems;
     }
 
     @Override
@@ -252,7 +280,7 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
     }
 
     public void createTestMarker() {
-        testItem = new PhotoItem(0, 0, (Uri)null, "test");
+        testItem = new PhotoItem(0, 0, null, "test", 0);
         gMap.addMarker(new MarkerOptions().position(testItem.getPosition()).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)).draggable(true).title("test"));
     }
 
@@ -262,26 +290,5 @@ public class BaseMapFragment extends MapFragment implements OnMapReadyCallback, 
         void onClusterClick(Collection<PhotoItem> items);
         void onCameraChange(CameraPosition cameraPosition);
         void onMapClick(LatLng latLng);
-        ArrayList<PhotoItem> getLoadedItems();
-    }
-
-    //used to force the API to bring the selected marker to front
-    private class DummyInfoWindowAdapter implements GoogleMap.InfoWindowAdapter {
-
-        private View view;
-
-        public DummyInfoWindowAdapter() {
-            view = new View(getActivity().getApplicationContext());
-        }
-        @Override
-        public View getInfoWindow(Marker marker) {
-            Log.d(LOG_TAG, "dummy view shown for info window");
-            return view;
-        }
-
-        @Override
-        public View getInfoContents(Marker marker) {
-            return null;
-        }
     }
 }

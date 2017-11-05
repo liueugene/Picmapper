@@ -45,7 +45,7 @@ public class PhotoGridAdapter extends RecyclerView.Adapter<PhotoGridAdapter.View
         holder.filenameText.setText(item.getFilename());
 
         Picasso.with(context)
-                .load(item.getFileUri())
+                .load(item.getContentUri())
                 .placeholder(placeholder)
                 .tag(LOAD_PHOTO_TAG)
                 .resize(photoSize, photoSize)

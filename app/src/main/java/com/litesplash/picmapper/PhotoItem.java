@@ -12,18 +12,20 @@ import java.io.File;
 public class PhotoItem implements ClusterItem, Parcelable {
     private double latitude;
     private double longitude;
-    private Uri fileUri;
+    private Uri contentUri;
     private String filename;
+    private long id;
 
-    public PhotoItem(double latitude, double longitude, Uri fileUri, String filename) {
+    public PhotoItem(double latitude, double longitude, Uri contentUri, String filename, long id) {
         this.latitude = latitude;
         this.longitude = longitude;
-        this.fileUri = fileUri;
+        this.contentUri = contentUri;
         this.filename = filename;
+        this.id = id;
     }
 
     public PhotoItem(double latitude, double longitude, File file) {
-        this(latitude, longitude, Uri.fromFile(file), file.getName());
+        this(latitude, longitude, Uri.fromFile(file), file.getName(), 0);
     }
 
     public double getLatitude() {
@@ -38,12 +40,24 @@ public class PhotoItem implements ClusterItem, Parcelable {
         return new LatLng(latitude, longitude);
     }
 
-    public Uri getFileUri() {
-        return fileUri;
+    public Uri getContentUri() {
+        return contentUri;
     }
 
     public String getFilename() {
         return filename;
+    }
+
+    public long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return filename;
+    }
+
+    public String getSnippet() {
+        return "";
     }
 
     public void setPosition(double latitude, double longitude) {
@@ -58,7 +72,7 @@ public class PhotoItem implements ClusterItem, Parcelable {
     protected PhotoItem(Parcel in) {
         latitude = in.readDouble();
         longitude = in.readDouble();
-        fileUri = in.readParcelable(Uri.class.getClassLoader());
+        contentUri = in.readParcelable(Uri.class.getClassLoader());
         filename = in.readString();
     }
 
@@ -71,7 +85,7 @@ public class PhotoItem implements ClusterItem, Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeDouble(latitude);
         dest.writeDouble(longitude);
-        dest.writeParcelable(fileUri, flags);
+        dest.writeParcelable(contentUri, flags);
         dest.writeString(filename);
     }
 
@@ -95,7 +109,7 @@ public class PhotoItem implements ClusterItem, Parcelable {
 
         PhotoItem other = (PhotoItem) o;
 
-        return (latitude == other.latitude  &&  longitude == other.longitude  &&  fileUri.equals(other.fileUri));
+        return (latitude == other.latitude  &&  longitude == other.longitude  &&  contentUri.equals(other.contentUri));
     }
 
     @Override
@@ -106,7 +120,7 @@ public class PhotoItem implements ClusterItem, Parcelable {
         result = (int) (temp ^ (temp >>> 32));
         temp = Double.doubleToLongBits(longitude);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
-        result = 31 * result + fileUri.hashCode();
+        result = 31 * result + contentUri.hashCode();
         return result;
     }
 }

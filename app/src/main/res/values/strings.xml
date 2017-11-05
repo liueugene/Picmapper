@@ -16,5 +16,6 @@
 
     <string name="no_photos_dialog_title">No photos found</string>
     <string name="no_photos_dialog_msg">Picmapper couldn\'t find any photos containing location data.\n\nCheck if location tagging is enabled in your camera settings.</string>
-    <string name="title_activity_tag_location">TagLocationActivity</string>
+
+    <string name="title_activity_tag_location">Tag a new location</string>
 </resources>

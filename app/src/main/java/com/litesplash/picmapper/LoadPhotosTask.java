@@ -1,6 +1,7 @@
 package com.litesplash.picmapper;
 
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -9,7 +10,7 @@ import android.provider.MediaStore;
 import java.util.ArrayList;
 
 /**
- * Created by Eugene on 7/13/2015.
+ * Loads photo data from local storage.
  */
 public class LoadPhotosTask extends AsyncTask<Void, Void, LoadPhotosTask.MarkerLists> {
 
@@ -35,7 +36,8 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, LoadPhotosTask.MarkerL
             String[] projection = {MediaStore.Images.Media._ID,
                     MediaStore.Images.Media.DISPLAY_NAME,
                     MediaStore.Images.Media.LATITUDE,
-                    MediaStore.Images.Media.LONGITUDE};
+                    MediaStore.Images.Media.LONGITUDE,
+                    MediaStore.MediaColumns.DATA};
 
             Cursor cursor = contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, null);
 
@@ -48,17 +50,16 @@ public class LoadPhotosTask extends AsyncTask<Void, Void, LoadPhotosTask.MarkerL
             int lonIndex = cursor.getColumnIndex(MediaStore.Images.Media.LONGITUDE);
 
             while (cursor.moveToNext()) {
-
                 long id = cursor.getLong(idIndex);
                 String name = cursor.getString(nameIndex);
                 double latitude = cursor.getDouble(latIndex);
                 double longitude = cursor.getDouble(lonIndex);
-                Uri uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Long.toString(id));
+                Uri uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
 
                 if (latitude == 0f && longitude == 0f)
-                    untaggedItems.add(new PhotoItem(latitude, longitude, uri, name));
+                    untaggedItems.add(new PhotoItem(latitude, longitude, uri, name, id));
                 else
-                    taggedItems.add(new PhotoItem(latitude, longitude, uri, name));
+                    taggedItems.add(new PhotoItem(latitude, longitude, uri, name, id));
             }
 
             cursor.close();

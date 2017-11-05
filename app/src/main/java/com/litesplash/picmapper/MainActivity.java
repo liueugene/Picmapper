@@ -16,6 +16,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
@@ -34,6 +35,7 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -130,6 +132,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private ArrayList<PhotoItem> taggedItems;
     private ArrayList<PhotoItem> untaggedItems;
 
+    private LruCache<PhotoItem, Bitmap> thumbnailCache;
+
     private int toolbarHeight;
     private int statusBarHeight;
     private float lastZoom;
@@ -190,6 +194,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         } else {
             taggedItems = retainerFragment.getPhotoItems();
         }
+
+        thumbnailCache = new LruCache<PhotoItem, Bitmap>(2 * 1024 * 1024) {
+            @Override
+            protected int sizeOf(PhotoItem key, Bitmap value) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT)
+                    return value.getByteCount();
+                else
+                    return value.getAllocationByteCount();
+            }
+        };
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             getWindow().setFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS, WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
@@ -527,7 +541,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
         clusterManager = new ClusterManager<PhotoItem>(getApplicationContext(), gMap);
-        renderer = new CustomClusterRenderer<PhotoItem>(getApplicationContext(), gMap, clusterManager);
+        renderer = new CustomClusterRenderer<PhotoItem>(getApplicationContext(), gMap, clusterManager, thumbnailCache);
 
         clusterManager.setRenderer(renderer);
         clusterManager.setOnClusterItemClickListener(this);
@@ -716,7 +730,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (lastActiveClusterItem != null) {
             Marker marker = renderer.getMarker(lastActiveClusterItem);
             if (marker != null) {
-                marker.setIcon(BitmapDescriptorFactory.defaultMarker());
+                // restore thumbnail from cache if available
+                Bitmap thumb = thumbnailCache.get(lastActiveClusterItem);
+                if (thumb == null)
+                    marker.setIcon(BitmapDescriptorFactory.defaultMarker());
+                else
+                    marker.setIcon(BitmapDescriptorFactory.fromBitmap(thumb));
                 lastActiveClusterItem = null;
                 return true;
             }
@@ -727,12 +746,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     public void setUnclusteredMarker(MarkerOptions options) {
         lastActiveUnclusteredMarker = gMap.addMarker(options);
-        lastActiveUnclusteredMarker.showInfoWindow();
+        lastActiveUnclusteredMarker.setZIndex(1.0f);
     }
 
     public void setActiveMarker(Marker marker) {
         marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-        marker.showInfoWindow();
+        marker.setZIndex(1.0f);
     }
 
     public Marker getActiveMarker() {
@@ -744,7 +763,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void createTestMarker() {
-        testItem = new PhotoItem(0, 0, (Uri)null, "test");
+        testItem = new PhotoItem(0, 0, null, "test", 0);
         gMap.addMarker(new MarkerOptions().position(testItem.getPosition()).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)).draggable(true).title("test"));
     }
 
@@ -802,6 +821,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         } else { //not geotagged, launch photo tagging activity
             Intent intent = new Intent(this, TagLocationActivity.class);
+            intent.putExtra(TagLocationActivity.PHOTO_ITEM, photoItem);
+            intent.putExtra(TagLocationActivity.TAG_TYPE, TagLocationActivity.NEW_TAG);
             startActivity(intent);
         }
     }

@@ -80,12 +80,12 @@ import com.google.maps.android.clustering.ClusterManager;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
-        GoogleMap.OnCameraChangeListener, GoogleMap.OnMarkerClickListener, ClusterManager.OnClusterItemClickListener<PhotoItem>, ClusterManager.OnClusterClickListener<PhotoItem>, PhotoGridFragment.Listener,
-        PhotoInfoFragment.PhotoInfoFragmentListener, LoadPhotosTask.Callback, SlideUpPanelLayout.Listener,
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        PhotoGridFragment.Listener,
+        PhotoInfoFragment.PhotoInfoFragmentListener, SlideUpPanelLayout.Listener,
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
+        MapContract.View {
 
     private static final String LOG_TAG = "MainActivity";
     private static final String RETAINER_FRAGMENT_TAG = "MapItemRetainerFragment";
@@ -97,6 +97,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final int OPEN_DIR_REQUEST = 1;
     private static final int READ_STORAGE_REQUEST = 2;
     private static final int MULTI_REQUEST = 3;
+
+    private MapPresenter mapPresenter;
 
     private Toolbar toolbar;
     private AppBarLayout appBarLayout;
@@ -129,8 +131,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private PlacesSuggestionAdapter searchAdapter;
 
     private PhotoItem activeItem;
-    private ArrayList<PhotoItem> taggedItems;
-    private ArrayList<PhotoItem> untaggedItems;
 
     private LruCache<PhotoItem, Bitmap> thumbnailCache;
 
@@ -183,6 +183,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_maps);
         FragmentManager fm = getFragmentManager();
 
+        mapPresenter = new MapPresenter(this);
+
         // retainer fragment for if the user has a large list of photos that can't fit into the savedInstanceState bundle
         // find existing fragment on activity restart
         retainerFragment = (MapItemRetainerFragment) fm.findFragmentByTag(RETAINER_FRAGMENT_TAG);
@@ -192,7 +194,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             retainerFragment = new MapItemRetainerFragment();
             fm.beginTransaction().add(retainerFragment, RETAINER_FRAGMENT_TAG).commit();
         } else {
-            taggedItems = retainerFragment.getPhotoItems();
+            ArrayList<PhotoItem> taggedItems = retainerFragment.getPhotoItems();
+            mapPresenter.setTaggedItems(taggedItems);
         }
 
         thumbnailCache = new LruCache<PhotoItem, Bitmap>(2 * 1024 * 1024) {
@@ -238,7 +241,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         navDrawer.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(MenuItem item) {
-
+                /*
                 if (item.getItemId() == R.id.untagged_photos) {
                     if (untaggedItems == null)
                         return false;
@@ -247,7 +250,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     showPhotoGrid(untaggedItems, PhotoGridFragment.UNTAGGED);
                     return true;
                 }
-
+                */
 
                 int type;
                 switch (item.getItemId()) {
@@ -472,7 +475,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onSaveInstanceState(outState);
         outState.putParcelable(ACTIVE_ITEM_KEY, activeItem);
         outState.putParcelable(LAST_ACTIVE_CLUSTER_ITEM, lastActiveClusterItem);
-        retainerFragment.setPhotoItems(taggedItems);
+        retainerFragment.setPhotoItems(mapPresenter.getTaggedItems());
 
     }
 
@@ -495,7 +498,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
 
-        new LoadPhotosTask(getContentResolver(), taggedItems, this).execute();
+        mapPresenter.loadPhotosFromStorage(getContentResolver());
 
         gMap = googleMap;
         getWindow().setBackgroundDrawable(null); //remove background overdraw
@@ -521,12 +524,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             gMap.setPadding(mapPaddingLeft, mapPaddingTop, mapPaddingRight, mapPaddingBottom);
         }
 
+        gMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
+            @Override
+            public void onCameraChange(CameraPosition cameraPosition) {
+                LatLngBounds bounds = gMap.getProjection().getVisibleRegion().latLngBounds;
 
-        gMap.setOnCameraChangeListener(this);
-        gMap.setOnMarkerClickListener(this);
+                if (searchAdapter != null)
+                    searchAdapter.setBounds(bounds);
+
+                if (cameraPosition.zoom < lastZoom) {
+                    if (setLastMarkerInactive())
+                        removeInfoFragment();
+                    hideToolbar();
+                }
+
+                lastZoom = cameraPosition.zoom;
+
+                clusterManager.onCameraIdle();
+            }
+        });
+
+        gMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                if (BuildConfig.DEBUG && "test".equals(marker.getTitle())) {
+                    onPhotoItemClick(testItem);
+                    return true;
+                }
+
+                return clusterManager.onMarkerClick(marker);
+            }
+        });
+
         gMap.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
             @Override
             public void onMarkerDragStart(Marker marker) {
+
             }
 
             @Override
@@ -544,8 +577,31 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         renderer = new CustomClusterRenderer<PhotoItem>(getApplicationContext(), gMap, clusterManager, thumbnailCache);
 
         clusterManager.setRenderer(renderer);
-        clusterManager.setOnClusterItemClickListener(this);
-        clusterManager.setOnClusterClickListener(this);
+        clusterManager.setOnClusterItemClickListener(new ClusterManager.OnClusterItemClickListener<PhotoItem>() {
+            @Override
+            public boolean onClusterItemClick(PhotoItem photoItem) {
+                Marker marker = renderer.getMarker(photoItem);
+
+                if (!photoItem.equals(lastActiveClusterItem)) {
+                    setLastMarkerInactive();
+                }
+
+                lastActiveClusterItem = photoItem;
+                onPhotoItemClick(photoItem);
+                setActiveMarker(marker);
+
+                return true;
+            }
+        });
+
+        clusterManager.setOnClusterClickListener(new ClusterManager.OnClusterClickListener<PhotoItem>() {
+            @Override
+            public boolean onClusterClick(Cluster<PhotoItem> cluster) {
+                setLastMarkerInactive();
+                showPhotoGrid(cluster.getItems(), PhotoGridFragment.GEOTAGGED);
+                return true;
+            }
+        });
 
         if (BuildConfig.DEBUG) {
             createTestMarker();
@@ -650,11 +706,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onPhotosReady(ArrayList<PhotoItem> taggedItems, ArrayList<PhotoItem> untaggedItems) {
+    public void showAlertDialog(int titleResId, int msgResId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(msgResId);
+        builder.setTitle(titleResId);
+        builder.setPositiveButton("OK", null);
 
-        clusterManager.addItems(taggedItems);
-        clusterManager.cluster();
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
 
+    @Override
+    public void finishLoading() {
         if (progressLayout != null) {
             ObjectAnimator fadeAnim = ObjectAnimator.ofFloat(progressLayout, "alpha", progressLayout.getAlpha(), 0f);
             fadeAnim.setDuration(500);
@@ -666,31 +729,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             });
             fadeAnim.start();
         }
-
-        //alert the user if no geotagged photos are found
-        if (taggedItems.isEmpty()) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setMessage(R.string.no_photos_dialog_msg);
-            builder.setTitle(R.string.no_photos_dialog_title);
-            builder.setPositiveButton("OK", null);
-
-            AlertDialog dialog = builder.create();
-            dialog.show();
-        }
-
-        this.taggedItems = taggedItems;
-        this.untaggedItems = untaggedItems;
-
-    }
-
-    @Override
-    public boolean onMarkerClick(Marker marker) {
-        if (BuildConfig.DEBUG && "test".equals(marker.getTitle())) {
-            onPhotoItemClick(testItem);
-            return true;
-        }
-
-        return clusterManager.onMarkerClick(marker);
     }
 
     public void onPhotoItemClick(PhotoItem item) {
@@ -699,25 +737,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public boolean onClusterItemClick(PhotoItem photoItem) {
-        Marker marker = renderer.getMarker(photoItem);
-
-        if (!photoItem.equals(lastActiveClusterItem)) {
-            setLastMarkerInactive();
-        }
-
-        lastActiveClusterItem = photoItem;
-        onPhotoItemClick(photoItem);
-        setActiveMarker(marker);
-
-        return true;
-    }
-
-    @Override
-    public boolean onClusterClick(Cluster<PhotoItem> cluster) {
-        setLastMarkerInactive();
-        showPhotoGrid(cluster.getItems(), PhotoGridFragment.GEOTAGGED);
-        return true;
+    public void addClusterItems(Collection<PhotoItem> items) {
+        clusterManager.addItems(items);
+        clusterManager.cluster();
     }
 
     public boolean setLastMarkerInactive() {
@@ -744,7 +766,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return false;
     }
 
-    public void setUnclusteredMarker(MarkerOptions options) {
+    public void addUnclusteredMarker(MarkerOptions options) {
         lastActiveUnclusteredMarker = gMap.addMarker(options);
         lastActiveUnclusteredMarker.setZIndex(1.0f);
     }
@@ -790,28 +812,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     @Override
-    public void onCameraChange(CameraPosition cameraPosition) {
-        LatLngBounds bounds = gMap.getProjection().getVisibleRegion().latLngBounds;
-
-        if (searchAdapter != null)
-            searchAdapter.setBounds(bounds);
-
-        if (cameraPosition.zoom < lastZoom) {
-            if (setLastMarkerInactive())
-                removeInfoFragment();
-            hideToolbar();
-        }
-
-        lastZoom = cameraPosition.zoom;
-
-        clusterManager.onCameraIdle();
-    }
-
-    @Override
     public void onPhotoGridItemClick(PhotoItem photoItem, int photoType) {
 
         if (photoType == PhotoGridFragment.GEOTAGGED) {
-            setUnclusteredMarker(new MarkerOptions()
+            addUnclusteredMarker(new MarkerOptions()
                     .position(photoItem.getPosition())
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
             getFragmentManager().popBackStackImmediate(); //hide grid fragment
@@ -1024,7 +1028,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             getLayoutInflater().inflate(R.layout.progress_layout, mapLayout);
             progressLayout = (RelativeLayout) findViewById(R.id.progress_layout);
             progressBar = (ProgressBar) progressLayout.findViewById(R.id.progressBar);
-            new LoadPhotosTask(getContentResolver(), taggedItems, this).execute();
+            mapPresenter.loadPhotosFromStorage(getContentResolver());
         }
     }
 
